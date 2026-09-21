@@ -1,0 +1,44 @@
+[project]
+name = "potd-trader"
+version = "0.1.0"
+description = "Buy the 0xinsider Pick of the Day on your own Polymarket account. Your keys stay on your machine."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+authors = [{ name = "0xinsider", email = "support@0xinsider.com" }]
+keywords = ["polymarket", "0xinsider", "pick-of-the-day", "sports", "prediction-markets"]
+dependencies = [
+    # Official Polymarket SDK: signs orders locally, talks to the CLOB.
+    "polymarket-client>=0.10,<0.11",
+    "httpx>=0.27,<1",
+    "pydantic>=2,<3",
+    "pydantic-settings>=2,<3",
+]
+
+[project.urls]
+Homepage = "https://0xinsider.com/pick-of-the-day"
+Guide = "https://docs.0xinsider.com/guides/auto-buy-the-pick"
+"API reference" = "https://docs.0xinsider.com/api-reference/endpoint/get-pick-of-the-day"
+Repository = "https://github.com/0xinsider/potd-trader"
+
+[project.scripts]
+potd-trader = "potd_trader.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.8.13,<0.9.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = ["mypy>=1.13", "ruff>=0.6"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+plugins = ["pydantic.mypy"]

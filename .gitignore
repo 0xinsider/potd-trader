@@ -1,0 +1,15 @@
+# Secrets and state: never committed.
+.env
+.env.*
+!.env.example
+data/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.mypy_cache/
+.ruff_cache/
