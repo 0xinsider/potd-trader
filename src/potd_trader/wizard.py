@@ -1,7 +1,8 @@
 """`potd-trader init`: one terminal session from nothing to a checked dry run.
 
-Keys are typed with echo off and written straight to the `.env` file at mode 0600. Nothing here
-prints a key, and nothing here sets `LIVE=yes` without the person typing the confirmation phrase.
+It creates a new folder and never writes into an existing one. Keys are typed with echo off and
+written straight to the folder's `.env` at mode 0600. Nothing here prints a key, and nothing here
+sets `LIVE=yes` without the person typing the confirmation phrase.
 """
 
 from __future__ import annotations
@@ -12,8 +13,6 @@ import re
 import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-
-from .config import active_env_file, home_dir
 
 LIVE_PHRASE = "spend real money"
 _HEX_KEY = re.compile(r"^(0x)?[0-9a-fA-F]{64}$")
@@ -109,23 +108,47 @@ def set_live(path: Path, live: bool) -> None:
         handle.write("\n".join(kept) + "\n")
 
 
+GITIGNORE = (
+    "# Written by potd-trader init. The key file and the order ledger never leave this folder.\n"
+    ".env\n"
+    "ledger.json\n"
+)
+
+
+def refuse_existing(directory: Path) -> Path:
+    """An existing folder is never written into, whatever it holds."""
+    directory = directory.expanduser()
+    if directory.exists():
+        raise SystemExit(
+            f"{directory} already exists; init never writes into an existing folder. Either cd "
+            f"into it and use it as it is, or pick a new name: potd-trader init <name>"
+        )
+    return directory
+
+
+def prepare_folder(directory: Path) -> Path:
+    """Create the folder (mode 700) with a .gitignore for the two files that must stay in it."""
+    directory = refuse_existing(directory)
+    directory.mkdir(parents=True, mode=0o700)
+    (directory / ".gitignore").write_text(GITIGNORE, encoding="utf-8")
+    return directory.resolve()
+
+
 def confirm_live() -> bool:
     say(f'Type "{LIVE_PHRASE}" to set LIVE=yes, or press Enter to stay in dry run.')
     return input("     > ").strip() == LIVE_PHRASE
 
 
-def collect() -> Path:
-    """Run the prompts and write the file. Returns the path written."""
+def collect(directory: Path) -> Path:
+    """Create the folder, run the prompts, write its `.env`. Returns the folder."""
+    refuse_existing(directory)
     require_tty()
-    target = active_env_file()
+    folder = prepare_folder(directory)
+    target = folder / ".env"
     say("potd-trader setup. Four questions, then a dry run. Nothing is bought.")
-    say(f"Writes {target} (mode 600). Your keys stay in that file and nowhere else.")
+    say(f"New folder: {folder}")
+    say("Your keys go in its .env (mode 600) and nowhere else.")
     say()
-    if target.exists():
-        answer = input(f"     {target} exists. Overwrite it? [y/N]: ").strip().lower()
-        if answer != "y":
-            raise SystemExit("kept the existing file. Edit it by hand, or delete it and rerun.")
-        say()
     values = {
         "OXINSIDER_API_KEY": ask_oxinsider_key(),
         "POLYMARKET_PRIVATE_KEY": ask_private_key(),
@@ -134,8 +157,7 @@ def collect() -> Path:
         "LIVE": "no",
     }
     write_env(target, values)
-    (home_dir()).mkdir(parents=True, exist_ok=True)
     say()
     say(f"Written: {target}")
     say()
-    return target
+    return folder

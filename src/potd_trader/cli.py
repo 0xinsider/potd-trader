@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 import logging
+import os
 import sys
 import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
+from pathlib import Path
 
 from polymarket import PolymarketError
 from pydantic import ValidationError
@@ -296,28 +298,37 @@ def cmd_setup(settings: Settings) -> int:
         account.close()
 
 
-def cmd_init() -> int:
-    """From nothing to a checked dry run in one terminal session."""
-    collect()
+def cmd_init(directory: Path) -> int:
+    """From nothing to a checked dry run in one terminal session, in a new folder."""
+    folder = collect(directory)
+    os.chdir(folder)
     settings = _settings()
     account_ok = cmd_status(settings) == 0
     log.info("")
     cmd_run(settings)
     log.info("")
     if not account_ok:
-        log.info("Fix the Polymarket values in %s, then `potd-trader status`.", active_env_file())
+        log.info(
+            "Fix the Polymarket values in %s, then run `potd-trader status` there.", folder / ".env"
+        )
         return 1
     if confirm_live():
-        set_live(active_env_file(), True)
+        set_live(folder / ".env", True)
         log.warning("LIVE=yes written. The next run or watch spends real pUSD.")
     else:
         log.info("Still a dry run. `potd-trader live on` flips it later.")
-    log.info("Keep it running with: potd-trader watch")
+    log.info("Next, from inside the folder:")
+    log.info("  cd %s", folder)
+    log.info("  potd-trader watch")
     return 0
 
 
 def cmd_live(state: str) -> int:
     path = active_env_file()
+    if not path.exists():
+        raise SystemExit(
+            "no .env in this directory. cd into the folder `potd-trader init` created, then rerun."
+        )
     if state == "off":
         set_live(path, False)
         log.info("LIVE=no written to %s. Dry run from here on.", path)
@@ -357,7 +368,16 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", action="version", version=f"potd-trader {__version__}")
     parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")
     sub = parser.add_subparsers(dest="command", required=True)
-    sub.add_parser("init", help="set up in one go: 4 questions, then status and a dry run")
+    init = sub.add_parser(
+        "init", help="create a folder, ask 4 questions, then run status and a dry run"
+    )
+    init.add_argument(
+        "directory",
+        nargs="?",
+        default="potd-trader",
+        type=Path,
+        help="the new folder to create (default: ./potd-trader); it must not exist yet",
+    )
     sub.add_parser("status", help="check region, account, approvals, balance and the ledger")
     sub.add_parser("setup", help="set trading approvals once (needs a Relayer API key)")
     sub.add_parser("run", help="read today's picks and buy each one at most once, then exit")
@@ -376,7 +396,7 @@ def main(argv: list[str] | None = None) -> int:
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
     if args.command == "init":
-        return cmd_init()
+        return cmd_init(args.directory)
     if args.command == "live":
         return cmd_live(args.state)
 

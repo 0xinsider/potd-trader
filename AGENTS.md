@@ -13,9 +13,9 @@ Seven files under `src/potd_trader/`:
 | `oxinsider.py` | `GET /api/v1/pick-of-the-day`: the 200 slate, the 404 `retry_at` schedule, 304, 429/503 |
 | `polymarket.py` | geoblock, market facts, the book quote, and the one write: a Fill-and-Kill market BUY |
 | `trader.py` | the guards, top to bottom, then `execute()` |
-| `ledger.py` | `~/.potd-trader/ledger.json`: the entry is written BEFORE the post, so a pick is bought at most once |
-| `config.py` | `~/.potd-trader/.env` (or a `.env` beside the code) to `Settings`; both keys are `SecretStr` |
-| `wizard.py` | `init`: the 4 questions with echo off, the `.env` write at 0600, the `LIVE` confirmation phrase |
+| `ledger.py` | `ledger.json` beside `.env`: the entry is written BEFORE the post, so a pick is bought at most once |
+| `config.py` | the current directory's `.env` (fallback `~/.potd-trader/.env`) to `Settings`; both keys are `SecretStr` |
+| `wizard.py` | `init`: a NEW folder (never an existing one), the 4 questions with echo off, `.env` at 0600, the `LIVE` phrase |
 | `cli.py` | `init`, `status`, `setup`, `run`, `watch`, `live`, `ledger` |
 
 Contracts to read before changing a call: the endpoint,
@@ -35,7 +35,7 @@ recalling a signature.
    never edit the line. That is the person's, in their own terminal. Never run `run` or `watch`
    while `.env` says `LIVE=yes` unless the person typed that instruction in this session.
 4. Never commit `.env` or `data/`. Both are in `.gitignore`; keep them there.
-5. Never edit the ledger (`~/.potd-trader/ledger.json`) except when the person asks after checking Activity on
+5. Never edit the ledger (`ledger.json` beside `.env`) except when the person asks after checking Activity on
    polymarket.com. A ledger entry is the only thing standing between a crash and a double buy.
 6. Never add a network destination. The program talks to `api.0xinsider.com`,
    `clob.polymarket.com`, `gamma-api.polymarket.com`, and `polymarket.com/api/geoblock`, and the
@@ -47,7 +47,8 @@ recalling a signature.
 ## Setting it up for a person
 
 The person wants it running in minutes. The fastest path is theirs, not yours: `potd-trader init`
-asks the 4 questions with echo off and needs a terminal, which you do not have. Offer it first:
+creates a fresh folder, asks the 4 questions with echo off, and needs a terminal, which you do not
+have. Offer it first:
 
 ```bash
 uv tool install git+https://github.com/0xinsider/potd-trader && potd-trader init

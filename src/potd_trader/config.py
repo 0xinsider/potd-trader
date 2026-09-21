@@ -6,9 +6,10 @@ Two secrets exist and both stay on this machine:
 - `POLYMARKET_PRIVATE_KEY` signs Polymarket orders inside this process. It is never sent
   anywhere. 0xinsider has no endpoint that accepts a wallet key.
 
-Files live in one home directory, `~/.potd-trader` (override with `POTD_TRADER_HOME`): the
-`.env` that `potd-trader init` writes and the ledger. A `.env` in the current directory, the
-repository-checkout layout, takes precedence over the home one.
+`potd-trader init` creates a folder (default `./potd-trader`) holding `.env` and, once a live
+order exists, `ledger.json`. Every command reads the `.env` in the current directory, so you run
+them from inside that folder. `~/.potd-trader/.env` (override the directory with
+`POTD_TRADER_HOME`) is a fallback for a machine-wide setup and is never written by `init`.
 """
 
 from __future__ import annotations
@@ -31,9 +32,14 @@ def env_files() -> tuple[Path, Path]:
 
 
 def active_env_file() -> Path:
-    """The file `init` and `live` write: the local one when it exists, else the home one."""
+    """The file in use: the one in the current directory when it exists, else the home one."""
     home, local = env_files()
     return local if local.exists() else home
+
+
+def default_ledger_path() -> Path:
+    """The ledger sits beside the `.env` in use."""
+    return active_env_file().parent / "ledger.json"
 
 
 class Settings(BaseSettings):
@@ -63,7 +69,7 @@ class Settings(BaseSettings):
     max_ranks: int = 6
 
     # Files and cadence.
-    ledger_path: Path = Field(default_factory=lambda: home_dir() / "ledger.json")
+    ledger_path: Path = Field(default_factory=default_ledger_path)
     watch_idle_minutes: int = 30
 
     @classmethod
@@ -96,5 +102,6 @@ class Settings(BaseSettings):
         if not self.has_polymarket_credentials:
             raise SystemExit(
                 "POLYMARKET_PRIVATE_KEY and POLYMARKET_WALLET_ADDRESS are both required for "
-                "this command. Run `potd-trader init`, or put them in the .env file."
+                "this command. Run `potd-trader init`, or put them in the .env file, and run "
+                "commands from inside the folder that holds it."
             )
