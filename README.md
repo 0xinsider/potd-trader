@@ -6,7 +6,7 @@ Polymarket account, one small market order per pick, at most once per pick.
 It runs on your machine. Your Polymarket key signs orders locally and never leaves the process.
 0xinsider only ever sees your 0xinsider API key, and only to hand you the pick.
 
-Guide with screenshots and the setup walk-through:
+The setup walk-through:
 **[docs.0xinsider.com/guides/auto-buy-the-pick](https://docs.0xinsider.com/guides/auto-buy-the-pick)**.
 API contract: [Get Pick of the Day](https://docs.0xinsider.com/api-reference/endpoint/get-pick-of-the-day).
 
@@ -21,7 +21,7 @@ API contract: [Get Pick of the Day](https://docs.0xinsider.com/api-reference/end
 
 Your private key is read from `.env`, held in memory by the official
 [`polymarket-client`](https://pypi.org/project/polymarket-client/) SDK, and used to sign. There is
-no 0xinsider endpoint that accepts a wallet key. The whole program is five short files under
+no 0xinsider endpoint that accepts a wallet key. The whole program is 6 short files under
 `src/potd_trader/`; read them.
 
 ## Setup
@@ -104,9 +104,9 @@ uv run potd-trader ledger
 
 ## Approvals
 
-A wallet that has traded on polymarket.com already has its trading approvals. A fresh wallet does
-not. `potd-trader setup` sets them gaslessly through a Relayer API key (polymarket.com, Settings,
-API Keys). It never places an order.
+`potd-trader status` reports whether the wallet's trading approvals are set. An account that has
+traded on polymarket.com usually has them; a fresh wallet does not. `potd-trader setup` sets them
+gaslessly through a Relayer API key (polymarket.com, Settings, API Keys). It never places an order.
 
 ## Settings
 
