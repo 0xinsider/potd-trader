@@ -24,7 +24,23 @@ Your private key is read from `.env`, held in memory by the official
 no 0xinsider endpoint that accepts a wallet key. The whole program is 6 short files under
 `src/potd_trader/`; read them.
 
-## Setup
+## Set it up with an AI agent
+
+Paste this into Claude Code, Codex, Cursor, or any agent that reads `AGENTS.md`:
+
+```text
+Clone https://github.com/0xinsider/potd-trader, read its AGENTS.md, and follow the
+"Setting it up for a person" steps in order. Install it, create .env from .env.example,
+then tell me which 3 values to fill in and where each comes from. Never ask me to paste
+a key into this chat and never print one. When I say the file is filled in, run
+`potd-trader status` and a dry `potd-trader run`, and explain what it would buy. Leave
+LIVE=no; I will change it myself.
+```
+
+The agent stops before anything spends money. `AGENTS.md` holds the rules it works under;
+`CLAUDE.md` points Claude Code at the same file.
+
+## Setup by hand
 
 You need Python 3.12+, [uv](https://docs.astral.sh/uv/), a 0xinsider Pro key, and a Polymarket
 account holding some pUSD.
