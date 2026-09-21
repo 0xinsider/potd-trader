@@ -47,12 +47,12 @@ potd-trader watch      # keep it running: wake at each release, buy, sleep
 Paste this into Claude Code, Codex, Cursor, or any agent that reads `AGENTS.md`:
 
 ```text
-Clone https://github.com/0xinsider/potd-trader, read its AGENTS.md, and follow the
-"Setting it up for a person" steps in order. Install it, create .env from .env.example,
-then tell me which 3 values to fill in and where each comes from. Never ask me to paste
-a key into this chat and never print one. When I say the file is filled in, run
-`potd-trader status` and a dry `potd-trader run`, and explain what it would buy. Leave
-LIVE=no; I will change it myself.
+Set up https://github.com/0xinsider/potd-trader for me. Read its AGENTS.md and the guide at
+https://docs.0xinsider.com/guides/auto-buy-the-pick, then follow the "Setting it up for a
+person" steps in order. Install it, create .env from .env.example, then tell me which 3
+values to fill in and where each comes from. Never ask me to paste a key into this chat and
+never print one. When I say the file is filled in, run `potd-trader status` and a dry
+`potd-trader run`, and explain what it would buy. Leave LIVE=no; I will change it myself.
 ```
 
 The agent stops before anything spends money. `AGENTS.md` holds the rules it works under;
