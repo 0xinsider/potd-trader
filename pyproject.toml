@@ -1,6 +1,6 @@
 [project]
 name = "potd-trader"
-version = "0.1.0"
+version = "0.2.0"
 description = "Buy the 0xinsider Pick of the Day on your own Polymarket account. Your keys stay on your machine."
 readme = "README.md"
 license = "MIT"

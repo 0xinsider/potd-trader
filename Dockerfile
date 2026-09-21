@@ -6,5 +6,6 @@ COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 RUN uv sync --frozen --no-dev
 VOLUME ["/app/data"]
+ENV POTD_TRADER_HOME=/app/data
 ENTRYPOINT ["uv", "run", "--no-sync", "potd-trader"]
 CMD ["watch"]

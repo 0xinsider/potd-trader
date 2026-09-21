@@ -1,4 +1,4 @@
-"""`potd-trader` commands: status, setup, run, watch, ledger."""
+"""`potd-trader` commands: init, status, setup, run, watch, live, ledger."""
 
 from __future__ import annotations
 
@@ -9,10 +9,11 @@ import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
+from polymarket import PolymarketError
 from pydantic import ValidationError
 
 from . import __version__
-from .config import Settings
+from .config import Settings, active_env_file
 from .ledger import Ledger
 from .oxinsider import (
     NotModified,
@@ -25,6 +26,7 @@ from .oxinsider import (
 )
 from .polymarket import Account, PublicReads, geoblock
 from .trader import Plan, execute, plan_slate
+from .wizard import LIVE_PHRASE, collect, confirm_live, require_tty, set_live
 
 log = logging.getLogger("potd-trader")
 
@@ -33,11 +35,11 @@ MIN_SLEEP = timedelta(seconds=30)
 
 def _settings() -> Settings:
     try:
-        return Settings()
+        return Settings.load()
     except ValidationError as exc:
         missing = ", ".join(str(err["loc"][0]).upper() for err in exc.errors())
         raise SystemExit(
-            f"Configuration problem: {missing}. Copy .env.example to .env and fill it in."
+            f"Configuration problem: {missing}. Run `potd-trader init`, or fill in the .env file."
         ) from exc
 
 
@@ -74,6 +76,20 @@ def _print_plans(plans: list[Plan]) -> None:
             log.info("SKIP %s | pick price %s | %s", pick.label, price, plan.reason)
 
 
+def _open_account(settings: Settings) -> Account | None:
+    """Build the account, or say why Polymarket refused the signer and wallet pair."""
+    try:
+        return Account(settings)
+    except PolymarketError as exc:
+        log.error(
+            "Polymarket refused this signer and wallet pair: %s Check "
+            "POLYMARKET_WALLET_ADDRESS (the address in your polymarket.com profile menu) and "
+            "POLYMARKET_PRIVATE_KEY (the signer that controls it).",
+            exc,
+        )
+        return None
+
+
 def _preflight(settings: Settings, total_stake: Decimal) -> Account | None:
     """Everything that must be true before the first live order. Returns None to abort."""
     geo = geoblock()
@@ -84,7 +100,9 @@ def _preflight(settings: Settings, total_stake: Decimal) -> Account | None:
             geo.region,
         )
         return None
-    account = Account(settings)
+    account = _open_account(settings)
+    if account is None:
+        return None
     log.info("Polymarket account %s (%s)", account.wallet, account.wallet_type)
     ready, missing = account.approvals_ready()
     if not ready:
@@ -211,6 +229,7 @@ def cmd_watch(settings: Settings) -> int:
 
 
 def cmd_status(settings: Settings) -> int:
+    """Region, account, approvals, balance, ledger. Non-zero when the account cannot be opened."""
     _mode_banner(settings)
     geo = geoblock()
     log.info(
@@ -219,29 +238,35 @@ def cmd_status(settings: Settings) -> int:
         geo.country,
         geo.region,
     )
+    account_ok = True
     if settings.has_polymarket_credentials:
-        account = Account(settings)
-        try:
-            log.info("Polymarket account %s (%s)", account.wallet, account.wallet_type)
-            ready, missing = account.approvals_ready()
-            log.info(
-                "Trading approvals: %s%s",
-                "SET" if ready else "MISSING",
-                "" if ready else f" ({missing})",
-            )
-            log.info("pUSD balance %s", account.collateral_balance_usd())
-        finally:
-            account.close()
+        account = _open_account(settings)
+        if account is None:
+            account_ok = False
+        else:
+            try:
+                log.info("Polymarket account %s (%s)", account.wallet, account.wallet_type)
+                ready, missing = account.approvals_ready()
+                log.info(
+                    "Trading approvals: %s%s",
+                    "SET" if ready else "MISSING",
+                    "" if ready else f" ({missing})",
+                )
+                log.info("pUSD balance %s", account.collateral_balance_usd())
+            finally:
+                account.close()
     else:
         log.info("Polymarket credentials not configured; only dry runs are possible.")
     ledger = Ledger(settings.ledger_path)
     entries = ledger.entries()
     log.info("Ledger %s: %d order(s)", settings.ledger_path, len(entries))
-    return 0
+    return 0 if account_ok else 1
 
 
 def cmd_setup(settings: Settings) -> int:
-    account = Account(settings)
+    account = _open_account(settings)
+    if account is None:
+        return 1
     try:
         log.info("Polymarket account %s (%s)", account.wallet, account.wallet_type)
         ready, missing = account.approvals_ready()
@@ -271,6 +296,41 @@ def cmd_setup(settings: Settings) -> int:
         account.close()
 
 
+def cmd_init() -> int:
+    """From nothing to a checked dry run in one terminal session."""
+    collect()
+    settings = _settings()
+    account_ok = cmd_status(settings) == 0
+    log.info("")
+    cmd_run(settings)
+    log.info("")
+    if not account_ok:
+        log.info("Fix the Polymarket values in %s, then `potd-trader status`.", active_env_file())
+        return 1
+    if confirm_live():
+        set_live(active_env_file(), True)
+        log.warning("LIVE=yes written. The next run or watch spends real pUSD.")
+    else:
+        log.info("Still a dry run. `potd-trader live on` flips it later.")
+    log.info("Keep it running with: potd-trader watch")
+    return 0
+
+
+def cmd_live(state: str) -> int:
+    path = active_env_file()
+    if state == "off":
+        set_live(path, False)
+        log.info("LIVE=no written to %s. Dry run from here on.", path)
+        return 0
+    require_tty()
+    if not confirm_live():
+        log.info("Unchanged: %s still says LIVE=no.", path)
+        return 1
+    set_live(path, True)
+    log.warning("LIVE=yes written to %s. The next run or watch spends real pUSD.", path)
+    return 0
+
+
 def cmd_ledger(settings: Settings) -> int:
     ledger = Ledger(settings.ledger_path)
     entries = ledger.entries()
@@ -297,10 +357,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--version", action="version", version=f"potd-trader {__version__}")
     parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")
     sub = parser.add_subparsers(dest="command", required=True)
+    sub.add_parser("init", help="set up in one go: 4 questions, then status and a dry run")
     sub.add_parser("status", help="check region, account, approvals, balance and the ledger")
     sub.add_parser("setup", help="set trading approvals once (needs a Relayer API key)")
     sub.add_parser("run", help="read today's picks and buy each one at most once, then exit")
     sub.add_parser("watch", help="keep running: wake for each release and buy as picks appear")
+    live = sub.add_parser("live", help=f'turn real orders on (type "{LIVE_PHRASE}") or off')
+    live.add_argument("state", choices=["on", "off"])
     sub.add_parser("ledger", help="print every order this tool has placed")
     args = parser.parse_args(argv)
 
@@ -311,6 +374,11 @@ def main(argv: list[str] | None = None) -> int:
         stream=sys.stdout,
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
+
+    if args.command == "init":
+        return cmd_init()
+    if args.command == "live":
+        return cmd_live(args.state)
 
     settings = _settings()
     commands = {

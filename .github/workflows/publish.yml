@@ -1,0 +1,45 @@
+name: Publish to PyPI
+
+# Publishes a GitHub release to https://pypi.org/project/potd-trader/ through PyPI trusted
+# publishing: no API token is stored anywhere. The PyPI project lists this repository and this
+# workflow file as its trusted publisher, and the `pypi` environment scopes the OIDC grant.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - name: Check the tag matches the package version
+        if: github.event_name == 'release'
+        run: |
+          version=$(python3 -c "import re;print(re.search(r'__version__ = \"(.+)\"', open('src/potd_trader/__init__.py').read()).group(1))")
+          test "v${version}" = "${GITHUB_REF_NAME}" || { echo "tag ${GITHUB_REF_NAME} does not match version ${version}"; exit 1; }
+      - run: uv build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          skip-existing: true

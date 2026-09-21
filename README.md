@@ -19,10 +19,28 @@ API contract: [Get Pick of the Day](https://docs.0xinsider.com/api-reference/end
 | `gamma-api.polymarket.com` | the pick's token id | to read the market's kickoff and status |
 | `polymarket.com/api/geoblock` | nothing (your IP, as any request does) | Polymarket's own "may this region trade?" check |
 
-Your private key is read from `.env`, held in memory by the official
+Your private key is read from `~/.potd-trader/.env`, held in memory by the official
 [`polymarket-client`](https://pypi.org/project/polymarket-client/) SDK, and used to sign. There is
-no 0xinsider endpoint that accepts a wallet key. The whole program is 6 short files under
+no 0xinsider endpoint that accepts a wallet key. The whole program is 7 short files under
 `src/potd_trader/`; read them.
+
+## One command
+
+```bash
+uv tool install git+https://github.com/0xinsider/potd-trader && potd-trader init
+```
+
+`init` asks 4 questions in the terminal (the two keys are typed with echo off), writes
+`~/.potd-trader/.env` at mode 600, then runs `status` and a dry run so you see what it would buy.
+It ends in dry-run mode unless you type the phrase it asks for. No `uv` yet?
+`curl -LsSf https://astral.sh/uv/install.sh | sh` (or `brew install uv`).
+
+Then:
+
+```bash
+potd-trader live on    # type "spend real money" to confirm; `live off` reverts
+potd-trader watch      # keep it running: wake at each release, buy, sleep
+```
 
 ## Set it up with an AI agent
 
@@ -42,6 +60,7 @@ The agent stops before anything spends money. `AGENTS.md` holds the rules it wor
 
 ## Setup by hand
 
+The repository-checkout layout: a `.env` next to the code takes precedence over `~/.potd-trader/.env`.
 You need Python 3.12+, [uv](https://docs.astral.sh/uv/), a 0xinsider Pro key, and a Polymarket
 account holding some pUSD.
 
@@ -72,9 +91,7 @@ uv run potd-trader run      # dry run: reads the pick, prints what it WOULD buy
 ## Run it for real
 
 ```bash
-# in .env
-LIVE=yes
-STAKE_USD=5
+potd-trader live on    # or set LIVE=yes in the file by hand
 ```
 
 ```bash
@@ -88,7 +105,7 @@ a `tmux` window, or the Docker image below.
 
 ```bash
 docker build -t potd-trader .
-docker run --rm --env-file .env -v "$PWD/data:/app/data" potd-trader
+docker run --rm --env-file ~/.potd-trader/.env -v "$HOME/.potd-trader:/app/data" potd-trader
 ```
 
 ## What it does, per pick
@@ -109,7 +126,7 @@ trading approvals are set, and that the balance covers the stakes.
 
 ## The ledger
 
-`data/ledger.json` records every live order with the pick's date, rank, token, stake, and the
+`~/.potd-trader/ledger.json` records every live order with the pick's date, rank, token, stake, and the
 exchange's answer. A pick with an entry in `submitting`, `accepted` or `unknown` is never bought
 again. `unknown` means the post threw before an answer arrived: check Polymarket, Activity, and
 delete the entry by hand if no order exists.
@@ -135,7 +152,8 @@ gaslessly through a Relayer API key (polymarket.com, Settings, API Keys). It nev
 | `DAILY_CAP_USD` | `25` | per product day, across picks; `0` disables |
 | `KICKOFF_BUFFER_MINUTES` | `5` | no buys this close to kickoff |
 | `MIN_RANKS` / `MAX_RANKS` | `1` / `6` | which ranked slots to buy |
-| `LEDGER_PATH` | `data/ledger.json` | where orders are recorded |
+| `LEDGER_PATH` | `~/.potd-trader/ledger.json` | where orders are recorded |
+| `POTD_TRADER_HOME` | `~/.potd-trader` | where `.env` and the ledger live |
 | `WATCH_IDLE_MINUTES` | `30` | `watch` cadence when nothing is scheduled |
 
 ## Read this before LIVE=yes
@@ -146,7 +164,7 @@ gaslessly through a Relayer API key (polymarket.com, Settings, API Keys). It nev
   [track record](https://0xinsider.com/pick-of-the-day/verify), computed on a $100 stake at the
   published price; your fills will differ.
 - Polymarket is not available in every region. The tool refuses to buy when Polymarket says so.
-- Keep `.env` private (`chmod 600`). Anyone with that file can trade from your account.
+- Keep `~/.potd-trader/.env` private (`init` writes it at mode 600). Anyone with that file can trade from your account.
 - MIT licensed, no warranty. 0xinsider does not operate, monitor, or custody anything here.
 
 ## Contributing

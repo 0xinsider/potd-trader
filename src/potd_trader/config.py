@@ -1,14 +1,19 @@
-"""Settings, read from the environment and an optional `.env` file.
+"""Settings, read from the environment and an `.env` file.
 
 Two secrets exist and both stay on this machine:
 
 - `OXINSIDER_API_KEY` is sent to api.0xinsider.com, and nowhere else, to read the pick.
 - `POLYMARKET_PRIVATE_KEY` signs Polymarket orders inside this process. It is never sent
   anywhere. 0xinsider has no endpoint that accepts a wallet key.
+
+Files live in one home directory, `~/.potd-trader` (override with `POTD_TRADER_HOME`): the
+`.env` that `potd-trader init` writes and the ledger. A `.env` in the current directory, the
+repository-checkout layout, takes precedence over the home one.
 """
 
 from __future__ import annotations
 
+import os
 from decimal import Decimal
 from pathlib import Path
 
@@ -16,8 +21,23 @@ from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
+def home_dir() -> Path:
+    return Path(os.environ.get("POTD_TRADER_HOME", "~/.potd-trader")).expanduser()
+
+
+def env_files() -> tuple[Path, Path]:
+    """Lowest precedence first: the home file, then a `.env` beside the caller."""
+    return home_dir() / ".env", Path(".env")
+
+
+def active_env_file() -> Path:
+    """The file `init` and `live` write: the local one when it exists, else the home one."""
+    home, local = env_files()
+    return local if local.exists() else home
+
+
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(env_file_encoding="utf-8", extra="ignore")
 
     # 0xinsider (read-only: the pick).
     oxinsider_api_key: SecretStr = Field(description="Pro API key, oxi_sk_live_...")
@@ -43,8 +63,12 @@ class Settings(BaseSettings):
     max_ranks: int = 6
 
     # Files and cadence.
-    ledger_path: Path = Path("data/ledger.json")
+    ledger_path: Path = Field(default_factory=lambda: home_dir() / "ledger.json")
     watch_idle_minutes: int = 30
+
+    @classmethod
+    def load(cls) -> Settings:
+        return cls(_env_file=tuple(str(path) for path in env_files()))
 
     @field_validator("stake_usd", "daily_cap_usd")
     @classmethod
@@ -72,5 +96,5 @@ class Settings(BaseSettings):
         if not self.has_polymarket_credentials:
             raise SystemExit(
                 "POLYMARKET_PRIVATE_KEY and POLYMARKET_WALLET_ADDRESS are both required for "
-                "this command. Put them in .env (see .env.example) and chmod 600 .env."
+                "this command. Run `potd-trader init`, or put them in the .env file."
             )

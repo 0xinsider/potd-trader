@@ -129,8 +129,12 @@ class Account:
         return Decimal(balance.balance) * COLLATERAL_BASE_UNIT
 
     def approvals_ready(self) -> tuple[bool, str]:
+        """(all set, a short count of what is missing) for the wallet's exchange approvals."""
         state = self._client.get_trading_approvals_state()
-        return bool(state.is_fully_approved), str(state.missing)
+        missing = state.missing
+        erc20 = len(getattr(missing, "erc20", ()) or ())
+        erc1155 = len(getattr(missing, "erc1155", ()) or ())
+        return bool(state.is_fully_approved), f"{erc20} ERC-20 and {erc1155} ERC-1155 approvals"
 
     def setup_approvals(self) -> None:
         """Gasless, idempotent, and only meaningful with a Relayer API key configured."""

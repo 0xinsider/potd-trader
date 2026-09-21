@@ -6,16 +6,17 @@ are working in it on behalf of that person. Real money is at stake and the two s
 
 ## What it is
 
-Six files under `src/potd_trader/`:
+Seven files under `src/potd_trader/`:
 
 | File | Owns |
 | --- | --- |
 | `oxinsider.py` | `GET /api/v1/pick-of-the-day`: the 200 slate, the 404 `retry_at` schedule, 304, 429/503 |
 | `polymarket.py` | geoblock, market facts, the book quote, and the one write: a Fill-and-Kill market BUY |
 | `trader.py` | the guards, top to bottom, then `execute()` |
-| `ledger.py` | `data/ledger.json`: the entry is written BEFORE the post, so a pick is bought at most once |
-| `config.py` | `.env` to `Settings`; both keys are `SecretStr` |
-| `cli.py` | `status`, `setup`, `run`, `watch`, `ledger` |
+| `ledger.py` | `~/.potd-trader/ledger.json`: the entry is written BEFORE the post, so a pick is bought at most once |
+| `config.py` | `~/.potd-trader/.env` (or a `.env` beside the code) to `Settings`; both keys are `SecretStr` |
+| `wizard.py` | `init`: the 4 questions with echo off, the `.env` write at 0600, the `LIVE` confirmation phrase |
+| `cli.py` | `init`, `status`, `setup`, `run`, `watch`, `live`, `ledger` |
 
 Contracts to read before changing a call: the endpoint,
 <https://docs.0xinsider.com/api-reference/endpoint/get-pick-of-the-day>; the SDK,
@@ -30,11 +31,11 @@ recalling a signature.
    would contain one, do not run it.
 2. Never ask the person to paste a key into the chat. Tell them which value goes on which line
    of `.env` and where it comes from; they type it into the file themselves.
-3. Never set `LIVE=yes`. That edit is the person's, made by hand, in their editor. Never run
-   `run` or `watch` while `.env` says `LIVE=yes` unless the person typed that instruction in this
-   session.
+3. Never set `LIVE=yes`: never run `potd-trader live on`, never type its confirmation phrase,
+   never edit the line. That is the person's, in their own terminal. Never run `run` or `watch`
+   while `.env` says `LIVE=yes` unless the person typed that instruction in this session.
 4. Never commit `.env` or `data/`. Both are in `.gitignore`; keep them there.
-5. Never edit `data/ledger.json` except when the person asks after checking Activity on
+5. Never edit the ledger (`~/.potd-trader/ledger.json`) except when the person asks after checking Activity on
    polymarket.com. A ledger entry is the only thing standing between a crash and a double buy.
 6. Never add a network destination. The program talks to `api.0xinsider.com`,
    `clob.polymarket.com`, `gamma-api.polymarket.com`, and `polymarket.com/api/geoblock`, and the
@@ -45,7 +46,14 @@ recalling a signature.
 
 ## Setting it up for a person
 
-The person wants it running in minutes. Do these in order and stop where it says stop.
+The person wants it running in minutes. The fastest path is theirs, not yours: `potd-trader init`
+asks the 4 questions with echo off and needs a terminal, which you do not have. Offer it first:
+
+```bash
+uv tool install git+https://github.com/0xinsider/potd-trader && potd-trader init
+```
+
+If they would rather you drive, do these in order and stop where it says stop.
 
 1. `uv sync` (needs Python 3.12+ and `uv`; install `uv` from <https://docs.astral.sh/uv/> if
    missing).
@@ -64,8 +72,9 @@ The person wants it running in minutes. Do these in order and stop where it says
    README (`potd-trader setup` with a Relayer API key) and stop.
 5. `uv run potd-trader run` with `LIVE=no`: a dry run. Explain each `BUY` and `SKIP` line. A 404
    with `Earliest change:` is the schedule, not an error; say when the next pick can appear.
-6. Stop. Say that `LIVE=yes` in `.env` is their edit, that `STAKE_USD` starts at 5, and that
-   `uv run potd-trader watch` keeps it running. Do not make the edit and do not start `watch`.
+6. Stop. Say that `potd-trader live on` (or `LIVE=yes` in `.env`) is theirs to run, that
+   `STAKE_USD` starts at 5, and that `potd-trader watch` keeps it running. Do not run `live on`,
+   do not make the edit, and do not start `watch`.
 
 ## Verification
 
