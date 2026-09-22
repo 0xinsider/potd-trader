@@ -1,6 +1,6 @@
 """Settings, read from the environment and an `.env` file.
 
-Two secrets exist and both stay on this machine:
+The API key and the wallet signing key have separate destinations:
 
 - `OXINSIDER_API_KEY` is sent to api.0xinsider.com, and nowhere else, to read the pick.
 - `POLYMARKET_PRIVATE_KEY` signs Polymarket orders inside this process. It is never sent
@@ -18,8 +18,16 @@ import os
 from decimal import Decimal
 from pathlib import Path
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+API_ORIGIN = "https://api.0xinsider.com"
+
+
+def validate_api_origin(value: str) -> str:
+    if value not in (API_ORIGIN, API_ORIGIN + "/"):
+        raise ValueError("OXINSIDER_API_BASE must be https://api.0xinsider.com")
+    return API_ORIGIN
 
 
 def home_dir() -> Path:
@@ -27,7 +35,7 @@ def home_dir() -> Path:
 
 
 def env_files() -> tuple[Path, Path]:
-    """Lowest precedence first: the home file, then a `.env` beside the caller."""
+    """Candidate files: the home fallback and a `.env` beside the caller."""
     return home_dir() / ".env", Path(".env")
 
 
@@ -43,7 +51,9 @@ def default_ledger_path() -> Path:
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file_encoding="utf-8", extra="ignore", allow_inf_nan=False
+    )
 
     # 0xinsider (read-only: the pick).
     oxinsider_api_key: SecretStr = Field(description="Pro API key, oxi_sk_live_...")
@@ -62,21 +72,34 @@ class Settings(BaseSettings):
     # Sizing and guards.
     stake_usd: Decimal = Decimal("5")
     max_price: Decimal = Decimal("0.925")
-    max_slippage_pct: Decimal = Decimal("3")
-    daily_cap_usd: Decimal = Decimal("25")
-    kickoff_buffer_minutes: int = 5
-    min_ranks: int = 1
-    max_ranks: int = 6
+    max_slippage_pct: Decimal = Field(default=Decimal("3"), ge=0)
+    daily_cap_usd: Decimal = Field(default=Decimal("25"), gt=0)
+    kickoff_buffer_minutes: int = Field(default=5, ge=0)
+    min_ranks: int = Field(default=1, ge=1, le=6)
+    max_ranks: int = Field(default=6, ge=1, le=6)
 
     # Files and cadence.
     ledger_path: Path = Field(default_factory=default_ledger_path)
-    watch_idle_minutes: int = 30
+    watch_idle_minutes: int = Field(default=30, ge=1, le=1440)
+    control_env_path: Path = Field(default_factory=lambda: active_env_file().resolve())
 
     @classmethod
     def load(cls) -> Settings:
-        return cls(_env_file=tuple(str(path) for path in env_files()))
+        path = active_env_file().resolve()
+        return cls(_env_file=str(path), control_env_path=path)
 
-    @field_validator("stake_usd", "daily_cap_usd")
+    @field_validator("oxinsider_api_base")
+    @classmethod
+    def _api_origin(cls, value: str) -> str:
+        return validate_api_origin(value)
+
+    @model_validator(mode="after")
+    def _rank_order(self) -> Settings:
+        if self.min_ranks > self.max_ranks:
+            raise ValueError("MIN_RANKS must not exceed MAX_RANKS")
+        return self
+
+    @field_validator("stake_usd")
     @classmethod
     def _non_negative(cls, value: Decimal) -> Decimal:
         if value < 0:
@@ -92,7 +115,7 @@ class Settings(BaseSettings):
 
     @property
     def is_live(self) -> bool:
-        return self.live.strip().lower() == "yes"
+        return self.live == "yes"
 
     @property
     def has_polymarket_credentials(self) -> bool:

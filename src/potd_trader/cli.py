@@ -5,18 +5,21 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import signal
 import sys
 import time
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 
+import httpx
 from polymarket import PolymarketError
 from pydantic import ValidationError
 
 from . import __version__
 from .config import Settings, active_env_file
-from .ledger import Ledger
+from .control import LiveControl
+from .ledger import Ledger, LedgerError
 from .oxinsider import (
     NotModified,
     NotReleased,
@@ -39,14 +42,16 @@ def _settings() -> Settings:
     try:
         return Settings.load()
     except ValidationError as exc:
-        missing = ", ".join(str(err["loc"][0]).upper() for err in exc.errors())
+        missing = ", ".join(
+            str(err["loc"][0]).upper() if err["loc"] else "SETTINGS" for err in exc.errors()
+        )
         raise SystemExit(
             f"Configuration problem: {missing}. Run `potd-trader init`, or fill in the .env file."
         ) from exc
 
 
 def _mode_banner(settings: Settings) -> None:
-    if settings.is_live:
+    if LiveControl(settings.control_env_path).enabled(settings.is_live):
         log.warning(
             "LIVE=yes: this run spends real pUSD. STAKE_USD=%s MAX_PRICE=%s DAILY_CAP_USD=%s",
             settings.stake_usd,
@@ -54,7 +59,7 @@ def _mode_banner(settings: Settings) -> None:
             settings.daily_cap_usd,
         )
     else:
-        log.info('DRY RUN (LIVE is not "yes"): nothing is bought. Plans are printed only.')
+        log.info("DRY RUN: live control is disabled for this run. Plans are printed only.")
 
 
 def _fmt_time(value: datetime | None) -> str:
@@ -87,7 +92,7 @@ def _open_account(settings: Settings) -> Account | None:
             "Polymarket refused this signer and wallet pair: %s Check "
             "POLYMARKET_WALLET_ADDRESS (the address in your polymarket.com profile menu) and "
             "POLYMARKET_PRIVATE_KEY (the signer that controls it).",
-            exc,
+            type(exc).__name__,
         )
         return None
 
@@ -105,27 +110,31 @@ def _preflight(settings: Settings, total_stake: Decimal) -> Account | None:
     account = _open_account(settings)
     if account is None:
         return None
-    log.info("Polymarket account %s (%s)", account.wallet, account.wallet_type)
-    ready, missing = account.approvals_ready()
-    if not ready:
-        log.error(
-            "Trading approvals are not set for this wallet (%s). Run `potd-trader setup` once "
-            "with a Relayer API key, or place one trade on polymarket.com first.",
-            missing,
-        )
+    try:
+        log.info("Polymarket account %s (%s)", account.wallet, account.wallet_type)
+        ready, missing = account.approvals_ready()
+        if not ready:
+            log.error(
+                "Trading approvals are not set for this wallet (%s). Run `potd-trader setup` once "
+                "with a Relayer API key, or place one trade on polymarket.com first.",
+                missing,
+            )
+            account.close()
+            return None
+        balance = account.collateral_balance_usd()
+        log.info("pUSD balance %s", balance)
+        if balance < total_stake:
+            log.error(
+                "Balance %s pUSD is below the %s pUSD this run wants to spend. Not buying.",
+                balance,
+                total_stake,
+            )
+            account.close()
+            return None
+        return account
+    except BaseException:
         account.close()
-        return None
-    balance = account.collateral_balance_usd()
-    log.info("pUSD balance %s", balance)
-    if balance < total_stake:
-        log.error(
-            "Balance %s pUSD is below the %s pUSD this run wants to spend. Not buying.",
-            balance,
-            total_stake,
-        )
-        account.close()
-        return None
-    return account
+        raise
 
 
 def _handle_result(
@@ -152,20 +161,26 @@ def _handle_result(
         len(slate.picks),
         len(slate.scheduled),
     )
-    plans = plan_slate(slate, settings=settings, ledger=ledger, reads=PublicReads())
-    _print_plans(plans)
-    buys = [plan for plan in plans if plan.buy]
-    if buys and settings.is_live:
-        total = sum((plan.stake_usd or Decimal("0") for plan in buys), Decimal("0"))
-        account = _preflight(settings, total)
-        if account is not None:
-            try:
-                for plan in buys:
-                    execute(plan, account=account, ledger=ledger)
-            finally:
-                account.close()
-    elif buys:
-        log.info("%d pick(s) would be bought. Set LIVE=yes to buy for real.", len(buys))
+    reads = PublicReads()
+    try:
+        plans = plan_slate(slate, settings=settings, ledger=ledger, reads=reads)
+        _print_plans(plans)
+        buys = [plan for plan in plans if plan.buy]
+        if buys and LiveControl(settings.control_env_path).enabled(settings.is_live):
+            total = sum((plan.stake_usd or Decimal("0") for plan in buys), Decimal("0"))
+            account = _preflight(settings, total)
+            if account is not None:
+                try:
+                    for plan in buys:
+                        execute(
+                            plan, account=account, ledger=ledger, settings=settings, reads=reads
+                        )
+                finally:
+                    account.close()
+        elif buys:
+            log.info("%d pick(s) would be bought. Live trading is off for this run.", len(buys))
+    finally:
+        reads.close()
     if slate.next_release_at:
         log.info("Next scheduled release: %s", _fmt_time(slate.next_release_at))
     return plans, slate
@@ -190,9 +205,11 @@ def _next_wake(
     idle = now + timedelta(minutes=settings.watch_idle_minutes)
     candidates: list[datetime] = []
     if isinstance(result, NotReleased | TryLater) and result.retry_at:
-        candidates.append(result.retry_at)
+        return max(result.retry_at, now + MIN_SLEEP)
+    if isinstance(result, TryLater):
+        return now + timedelta(minutes=5)
     if isinstance(result, Slate) and result.next_release_at:
-        candidates.append(result.next_release_at)
+        candidates.append(min(result.next_release_at, idle))
     if any(plan.transient for plan in plans):
         candidates.append(now + timedelta(minutes=5))
     wake = min(candidates) if candidates else idle
@@ -200,6 +217,13 @@ def _next_wake(
 
 
 def cmd_watch(settings: Settings) -> int:
+    settings = settings.model_copy(
+        update={
+            "live": "yes"
+            if LiveControl(settings.control_env_path).enabled(settings.is_live)
+            else "no"
+        }
+    )
     _mode_banner(settings)
     log.info("Watching. Ctrl-C stops it. Nothing is polled faster than the server asks for.")
     client = OxinsiderClient(
@@ -207,10 +231,23 @@ def cmd_watch(settings: Settings) -> int:
     )
     etag: str | None = None
     last_slate: Slate | None = None
+    read_failures = 0
     try:
         while True:
             ledger = Ledger(settings.ledger_path)
-            result = client.pick_of_the_day(etag=etag)
+            try:
+                result = client.pick_of_the_day(etag=etag)
+                read_failures = 0
+            except httpx.TransportError as exc:
+                read_failures += 1
+                delay = min(300, 30 * 2 ** min(read_failures - 1, 4))
+                log.warning(
+                    "Pick read failed (%s); no orders attempted, retry in %ss",
+                    type(exc).__name__,
+                    delay,
+                )
+                time.sleep(delay)
+                continue
             if isinstance(result, NotModified) and last_slate is not None:
                 # Same picks as before: re-plan them, because the book or the ledger may have moved.
                 result = last_slate
@@ -261,7 +298,17 @@ def cmd_status(settings: Settings) -> int:
         log.info("Polymarket credentials not configured; only dry runs are possible.")
     ledger = Ledger(settings.ledger_path)
     entries = ledger.entries()
-    log.info("Ledger %s: %d order(s)", settings.ledger_path, len(entries))
+    log.info("Ledger %s: %d order(s)", ledger.path, len(entries))
+    log.info(
+        "UTC budget reserved: %s / %s pUSD (includes unresolved older orders)",
+        ledger.spent_today_usd(),
+        settings.daily_cap_usd,
+    )
+    unresolved = sum(entry["state"] in {"submitting", "unknown"} for _, entry in entries)
+    if unresolved:
+        log.warning(
+            "%d unresolved order(s): inspect Polymarket Activity before any ledger edit", unresolved
+        )
     return 0 if account_ok else 1
 
 
@@ -302,7 +349,7 @@ def cmd_init(directory: Path) -> int:
     """From nothing to a checked dry run in one terminal session, in a new folder."""
     folder = collect(directory)
     os.chdir(folder)
-    settings = _settings()
+    settings = _settings().model_copy(update={"live": "no"})
     account_ok = cmd_status(settings) == 0
     log.info("")
     cmd_run(settings)
@@ -329,13 +376,26 @@ def cmd_live(state: str) -> int:
         raise SystemExit(
             "no .env in this directory. cd into the folder `potd-trader init` created, then rerun."
         )
+    control = LiveControl(path)
+    if state == "status":
+        log.info(
+            "Live control %s: %s; stop flag %s",
+            path.resolve(),
+            "enabled" if control.enabled(True) else "disabled",
+            control.halt_path,
+        )
+        return 0
     if state == "off":
         set_live(path, False)
-        log.info("LIVE=no written to %s. Dry run from here on.", path)
+        log.info(
+            "Trading stopped for %s, including running watchers using this folder. "
+            "Earlier submitted orders are not cancelled.",
+            path.resolve(),
+        )
         return 0
     require_tty()
     if not confirm_live():
-        log.info("Unchanged: %s still says LIVE=no.", path)
+        log.info("Live control unchanged: %s.", path)
         return 1
     set_live(path, True)
     log.warning("LIVE=yes written to %s. The next run or watch spends real pUSD.", path)
@@ -380,12 +440,17 @@ def main(argv: list[str] | None = None) -> int:
     )
     sub.add_parser("status", help="check region, account, approvals, balance and the ledger")
     sub.add_parser("setup", help="set trading approvals once (needs a Relayer API key)")
-    sub.add_parser("run", help="read today's picks and buy each one at most once, then exit")
-    sub.add_parser("watch", help="keep running: wake for each release and buy as picks appear")
+    run = sub.add_parser("run", help="read today's picks and buy each one at most once, then exit")
+    watch = sub.add_parser("watch", help="wake for each release and buy as picks appear")
+    for command in (run, watch):
+        command.add_argument(
+            "--dry-run", action="store_true", help="force no orders, even if LIVE=yes"
+        )
     live = sub.add_parser("live", help=f'turn real orders on (type "{LIVE_PHRASE}") or off')
-    live.add_argument("state", choices=["on", "off"])
+    live.add_argument("state", choices=["on", "off", "status"])
     sub.add_parser("ledger", help="print every order this tool has placed")
     args = parser.parse_args(argv)
+    signal.signal(signal.SIGTERM, _terminate)
 
     logging.basicConfig(
         level=logging.DEBUG if args.verbose else logging.INFO,
@@ -395,12 +460,6 @@ def main(argv: list[str] | None = None) -> int:
     )
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
-    if args.command == "init":
-        return cmd_init(args.directory)
-    if args.command == "live":
-        return cmd_live(args.state)
-
-    settings = _settings()
     commands = {
         "status": cmd_status,
         "setup": cmd_setup,
@@ -409,10 +468,30 @@ def main(argv: list[str] | None = None) -> int:
         "ledger": cmd_ledger,
     }
     try:
+        if args.command == "init":
+            return cmd_init(args.directory)
+        if args.command == "live":
+            return cmd_live(args.state)
+        settings = _settings()
+        if getattr(args, "dry_run", False):
+            settings = settings.model_copy(update={"live": "no"})
         return commands[args.command](settings)
-    except OxinsiderError as exc:
+    except KeyboardInterrupt:
+        log.info("Stopped; any interrupted submission remains reserved in the ledger.")
+        return 130
+    except (OxinsiderError, LedgerError) as exc:
         log.error("%s", exc)
         return 1
+    except (httpx.HTTPError, PolymarketError, OSError, ValueError) as exc:
+        log.error(
+            "Command stopped (%s). Check configuration/network and ledger before retrying.",
+            type(exc).__name__,
+        )
+        return 1
+
+
+def _terminate(signum: int, frame: object) -> None:
+    raise KeyboardInterrupt
 
 
 if __name__ == "__main__":

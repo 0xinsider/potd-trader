@@ -14,8 +14,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: uv sync --frozen
-      - run: uv run ruff check .
-      - run: uv run ruff format --check src
-      - run: uv run mypy src
-      - run: uv run potd-trader --help
+      - run: ./scripts/pre-merge-check.sh

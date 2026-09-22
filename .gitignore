@@ -3,6 +3,11 @@
 .env.*
 !.env.example
 data/
+ledger.json*
+.ledger.json-*
+.env-*
+.live.lock
+HALT
 
 # Python
 .venv/
