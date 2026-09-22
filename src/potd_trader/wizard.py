@@ -8,11 +8,13 @@ sets `LIVE=yes` without the person typing the confirmation phrase.
 from __future__ import annotations
 
 import getpass
-import os
 import re
 import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
+
+from .control import LiveControl
+from .storage import atomic_write
 
 LIVE_PHRASE = "spend real money"
 _HEX_KEY = re.compile(r"^(0x)?[0-9a-fA-F]{64}$")
@@ -84,34 +86,27 @@ def ask_stake() -> str:
             stake = Decimal(value)
         except InvalidOperation:
             stake = Decimal("-1")
-        if stake > 0:
+        if stake.is_finite() and stake > 0:
             return str(stake)
         say("     a positive number, like 5. Try again.")
 
 
 def write_env(path: Path, values: dict[str, str]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
     body = "\n".join(f"{key}={value}" for key, value in values.items()) + "\n"
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(body)
-    os.chmod(path, 0o600)
+    atomic_write(path, body)
 
 
 def set_live(path: Path, live: bool) -> None:
-    """Rewrite the LIVE line in place, keeping every other line byte for byte."""
-    lines = path.read_text(encoding="utf-8").splitlines() if path.exists() else []
-    kept = [line for line in lines if not line.startswith("LIVE=")]
-    kept.append(f"LIVE={'yes' if live else 'no'}")
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write("\n".join(kept) + "\n")
+    LiveControl(path).set_live(live)
 
 
 GITIGNORE = (
     "# Written by potd-trader init. The key file and the order ledger never leave this folder.\n"
     ".env\n"
-    "ledger.json\n"
+    "ledger.json*\n"
+    ".ledger.json-*\n"
+    ".live.lock\n"
+    "HALT\n"
 )
 
 

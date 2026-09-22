@@ -1,0 +1,14 @@
+.git
+.venv
+.env
+.env.*
+.env-*
+data
+ledger.json*
+.ledger.json-*
+HALT
+.live.lock
+__pycache__
+*.pyc
+.mypy_cache
+.ruff_cache

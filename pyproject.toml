@@ -1,6 +1,6 @@
 [project]
 name = "potd-trader"
-version = "0.2.0"
+version = "0.3.0"
 description = "Buy the 0xinsider Pick of the Day on your own Polymarket account. Your keys stay on your machine."
 readme = "README.md"
 license = "MIT"
@@ -9,10 +9,11 @@ authors = [{ name = "0xinsider", email = "support@0xinsider.com" }]
 keywords = ["polymarket", "0xinsider", "pick-of-the-day", "sports", "prediction-markets"]
 dependencies = [
     # Official Polymarket SDK: signs orders locally, talks to the CLOB.
-    "polymarket-client>=0.10,<0.11",
+    "polymarket-client==0.10.0",
     "httpx>=0.27,<1",
     "pydantic>=2,<3",
     "pydantic-settings>=2,<3",
+    "python-dotenv>=1.2,<2",
 ]
 
 [project.urls]
@@ -25,7 +26,7 @@ Repository = "https://github.com/0xinsider/potd-trader"
 potd-trader = "potd_trader.cli:main"
 
 [build-system]
-requires = ["uv_build>=0.8.13,<0.9.0"]
+requires = ["uv_build==0.8.13"]
 build-backend = "uv_build"
 
 [dependency-groups]

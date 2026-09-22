@@ -21,6 +21,7 @@ from polymarket import (
     RejectedOrder,
     RelayerApiKey,
     SecureClient,
+    SignedOrder,
 )
 
 from .config import Settings
@@ -59,6 +60,8 @@ class MarketFacts:
     seconds_delay: int | None
     minimum_order_size: Decimal | None
     tick_size: Decimal | None
+    condition_id: str | None
+    token_ids: tuple[str | None, str | None]
 
 
 class PublicReads:
@@ -80,7 +83,15 @@ class PublicReads:
             seconds_delay=market.trading.seconds_delay if market.trading else None,
             minimum_order_size=market.trading.minimum_order_size if market.trading else None,
             tick_size=market.trading.minimum_tick_size if market.trading else None,
+            condition_id=str(market.condition_id) if market.condition_id else None,
+            token_ids=(
+                str(market.outcomes.yes.token_id) if market.outcomes.yes.token_id else None,
+                str(market.outcomes.no.token_id) if market.outcomes.no.token_id else None,
+            ),
         )
+
+    def close(self) -> None:
+        self._client.close()
 
     def estimate_buy_price(self, token_id: str, stake_usd: Decimal) -> Decimal | None:
         """The price level a FAK BUY of `stake_usd` reaches on the current book. None: no depth."""
@@ -140,11 +151,9 @@ class Account:
         """Gasless, idempotent, and only meaningful with a Relayer API key configured."""
         self._client.setup_trading_approvals()
 
-    def buy(
-        self, token_id: str, stake_usd: Decimal, max_price: Decimal
-    ) -> AcceptedOrder | RejectedOrder:
-        """One Fill-and-Kill market BUY: fills up to `max_price`, cancels the rest."""
-        return self._client.place_market_order(
+    def prepare_buy(self, token_id: str, stake_usd: Decimal, max_price: Decimal) -> SignedOrder:
+        """Sign a Fill-and-Kill BUY without sending it to the exchange."""
+        return self._client.create_market_order(
             token_id=token_id,
             side="BUY",
             amount=str(stake_usd),
@@ -152,6 +161,10 @@ class Account:
             order_type="FAK",
             builder_code=self._builder_code,
         )
+
+    def submit_buy(self, signed: SignedOrder) -> AcceptedOrder | RejectedOrder:
+        """Submit once; never auto-approve or retry an ambiguous response."""
+        return self._client.post_order(signed)
 
     def close(self) -> None:
         self._client.close()
