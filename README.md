@@ -14,13 +14,13 @@ Python 3.12+ and [uv](https://docs.astral.sh/uv/) are required. Supported system
 Linux, including WSL. The process locks require a local filesystem, not NFS or a synced folder.
 
 ```bash
-git clone --branch v0.3.0 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.1 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
 ```
 
-The [v0.3.0 release](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.0) identifies the
+The [v0.3.1 release](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.1) identifies the
 merged commit and includes SHA-256 checksums for its package artifacts. For an immutable source
 pin, check out that full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
