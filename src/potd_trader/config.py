@@ -21,6 +21,11 @@ from pathlib import Path
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# The most picks one product day carries; ranks run 1 to this. 0xinsider raised it from 6
+# to 10 on 2026-09-24, and a slate with rank 7 or higher failed validation whole, so no
+# pick traded on those days.
+MAX_DAILY_PICKS = 10
+
 API_ORIGIN = "https://api.0xinsider.com"
 
 
@@ -75,8 +80,9 @@ class Settings(BaseSettings):
     max_slippage_pct: Decimal = Field(default=Decimal("3"), ge=0)
     daily_cap_usd: Decimal = Field(default=Decimal("25"), gt=0)
     kickoff_buffer_minutes: int = Field(default=5, ge=0)
-    min_ranks: int = Field(default=1, ge=1, le=6)
-    max_ranks: int = Field(default=6, ge=1, le=6)
+    min_ranks: int = Field(default=1, ge=1, le=MAX_DAILY_PICKS)
+    # Defaults to the top 6 of up to 10, as before the day grew; MAX_RANKS=10 buys every pick.
+    max_ranks: int = Field(default=6, ge=1, le=MAX_DAILY_PICKS)
 
     # Files and cadence.
     ledger_path: Path = Field(default_factory=default_ledger_path)

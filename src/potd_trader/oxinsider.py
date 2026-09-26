@@ -18,7 +18,7 @@ import httpx
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from . import __version__
-from .config import validate_api_origin
+from .config import MAX_DAILY_PICKS, validate_api_origin
 
 PICK_PATH = "/api/v1/pick-of-the-day"
 
@@ -44,7 +44,7 @@ class Pick(BaseModel):
     model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
 
     pick_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
-    pick_rank: int = Field(default=1, ge=1, le=6)
+    pick_rank: int = Field(default=1, ge=1, le=MAX_DAILY_PICKS)
     outcome: str
     matchup: str | None = None
     pick_outcome_label: str | None = None
@@ -81,7 +81,7 @@ class Pick(BaseModel):
 class ScheduledSlot(BaseModel):
     model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
 
-    pick_rank: int = Field(ge=1, le=6)
+    pick_rank: int = Field(ge=1, le=MAX_DAILY_PICKS)
     release_at: AwareDatetime
     kickoff: AwareDatetime | None = None
     retry_at: AwareDatetime | None = None

@@ -172,7 +172,7 @@ active `.env` control file containing `LIVE=yes`; keys may still come from the e
 | `MAX_SLIPPAGE_PCT` | `3` | maximum increase over the published backed price |
 | `DAILY_CAP_USD` | `25` | positive ceiling on UTC order principal plus unresolved prior intents |
 | `KICKOFF_BUFFER_MINUTES` | `5` | stop buying this far before kickoff or authorization expiry |
-| `MIN_RANKS` / `MAX_RANKS` | `1` / `6` | inclusive ranked slots |
+| `MIN_RANKS` / `MAX_RANKS` | `1` / `6` | inclusive ranked slots; a day carries up to 10 picks, so `MAX_RANKS=10` buys every one |
 | `LEDGER_PATH` | `ledger.json` beside `.env` | shared durable order state |
 | `POTD_TRADER_HOME` | `~/.potd-trader` | fallback configuration folder |
 | `WATCH_IDLE_MINUTES` | `30` | idle recheck cadence |
