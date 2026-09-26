@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.3.1
+
+- Accept slates of up to 10 picks. 0xinsider raised the daily maximum from 6 to 10 on
+  2026-09-24; a slate with rank 7 or higher failed validation as a whole, so the trader bought
+  nothing on those days. `MIN_RANKS` and `MAX_RANKS` now accept 1 to 10. The default still buys
+  ranks 1 to 6; set `MAX_RANKS=10` to buy every pick. `DAILY_CAP_USD` bounds the day either way.
+
 ## 0.3.0
 
 - `live off` stops running watchers sharing the configuration folder and waits for in-flight
