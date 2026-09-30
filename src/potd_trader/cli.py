@@ -309,6 +309,9 @@ def cmd_watch(settings: Settings) -> int:
 def cmd_status(settings: Settings) -> int:
     """Region, account, approvals, balance, ledger. Non-zero when the account cannot be opened."""
     _mode_banner(settings)
+    ledger = Ledger(settings.ledger_path)
+    spent = ledger.spent_today_usd()
+    _budget_banner(settings, spent)
     geo = geoblock()
     log.info(
         "Polymarket geoblock: %s (%s %s)",
@@ -335,15 +338,13 @@ def cmd_status(settings: Settings) -> int:
                 account.close()
     else:
         log.info("Polymarket credentials not configured; only dry runs are possible.")
-    ledger = Ledger(settings.ledger_path)
     entries = ledger.entries()
     log.info("Ledger %s: %d order(s)", ledger.path, len(entries))
     log.info(
         "UTC budget reserved: %s / %s pUSD (includes unresolved older orders)",
-        ledger.spent_today_usd(),
+        spent,
         settings.daily_cap_usd,
     )
-    _budget_banner(settings, ledger.spent_today_usd())
     unresolved = sum(entry["state"] in {"submitting", "unknown"} for _, entry in entries)
     if unresolved:
         log.warning(
