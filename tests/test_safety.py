@@ -33,6 +33,7 @@ from potd_trader.oxinsider import (
 )
 from potd_trader.polymarket import Account, MarketFacts
 from potd_trader.trader import execute, plan_slate
+from potd_trader.wizard import configure_size
 
 D = Decimal
 CONDITION = "0x" + "a" * 64
@@ -370,6 +371,89 @@ class SafetyTests(unittest.TestCase):
         with self.assertRaisesRegex(OxinsiderError, "duplicate"):
             parse_slate({"pick_date": row["pick_date"], "picks": [row, row]}, None)
         self.assertFalse(any(plan.buy for plan in self.plans(self.pick, self.pick)))
+
+    def test_all_ten_slots_share_one_unit_size_and_fake_exchange(self):
+        self.settings = self.settings.model_copy(update={"daily_cap_usd": D("50")})
+        picks = tuple(
+            Pick.model_validate(pick_data(rank, str(100 + rank))) for rank in range(1, 11)
+        )
+        plans = self.plans(*picks)
+        self.assertEqual(len(plans), 10)
+        self.assertTrue(all(plan.buy and plan.stake_usd == D("5") for plan in plans))
+        for plan in plans:
+            self.assertTrue(self.execute(plan))
+        self.assertEqual(len(self.account.orders), 10)
+        self.assertEqual(self.ledger.spent_today_usd(), D("50"))
+        self.assertTrue(all(not plan.buy for plan in self.plans(*picks)))
+
+    def test_tight_budget_uses_release_time_then_token_not_rank(self):
+        self.settings = self.settings.model_copy(update={"daily_cap_usd": D("5")})
+        now = datetime.now(UTC)
+        late_rank_one = pick_data(1, "999", now)
+        early_rank_ten = pick_data(10, "111", now)
+        early_rank_ten["release_at"] = (now - timedelta(minutes=3)).isoformat()
+        plans = self.plans(Pick.model_validate(late_rank_one), Pick.model_validate(early_rank_ten))
+        self.assertEqual([plan.pick.pick_rank for plan in plans], [10, 1])
+        self.assertTrue(plans[0].buy)
+        self.assertIn("DAILY_CAP_USD", plans[1].reason)
+
+        # Equal release times break on token, even when that token has the later rank.
+        early_rank_ten["release_at"] = late_rank_one["release_at"]
+        tied = self.plans(Pick.model_validate(late_rank_one), Pick.model_validate(early_rank_ten))
+        self.assertEqual([plan.pick.pick_rank for plan in tied], [10, 1])
+
+    def test_explicit_legacy_rank_range_still_restricts_trading(self):
+        self.settings = self.settings.model_copy(update={"max_ranks": 6})
+        high = Pick.model_validate(pick_data(10, "110"))
+        self.assertIn("outside MIN_RANKS..MAX_RANKS", self.plans(high)[0].reason)
+
+    def test_watcher_plans_later_rank_ten_release_in_dry_run(self):
+        now = datetime.now(UTC)
+        first = pick_data(1, "101", now)
+        later = pick_data(10, "110", now)
+        initial = parse_slate(
+            {
+                "pick_date": first["pick_date"],
+                "picks": [first],
+                "proof_pending_picks": [
+                    {
+                        "pick_rank": 10,
+                        "release_at": (now + timedelta(minutes=1)).isoformat(),
+                        "retry_at": (now + timedelta(minutes=1)).isoformat(),
+                    }
+                ],
+            },
+            None,
+        )
+        updated = parse_slate({"pick_date": first["pick_date"], "picks": [first, later]}, None)
+        client = Mock()
+        client.pick_of_the_day.side_effect = [initial, updated]
+        printed = []
+        with (
+            patch.object(cli, "OxinsiderClient", return_value=client),
+            patch.object(cli, "PublicReads", return_value=self.reads),
+            patch.object(cli, "_print_plans", side_effect=printed.append),
+            patch.object(cli.time, "sleep", side_effect=[None, KeyboardInterrupt]),
+            patch.object(cli, "_preflight") as preflight,
+        ):
+            self.assertEqual(cli.cmd_watch(self.settings.model_copy(update={"live": "no"})), 0)
+        self.assertEqual(len(printed), 2)
+        self.assertTrue(any(plan.buy and plan.pick.pick_rank == 10 for plan in printed[1]))
+        preflight.assert_not_called()
+
+    def test_interactive_sizing_preserves_other_config_and_requires_live_off(self):
+        path = self.folder / ".env"
+        path.write_text("LIVE=yes\nOXINSIDER_API_KEY=fake-test-key\nMAX_RANKS=6\nSTAKE_USD=5\n")
+        with self.assertRaisesRegex(ValueError, "live off"):
+            configure_size(path, "3", "30", include_all=True)
+        LiveControl(path).set_live(False)
+        configure_size(path, "3", "30", include_all=True)
+        contents = path.read_text()
+        self.assertIn("STAKE_USD=3\n", contents)
+        self.assertIn("DAILY_CAP_USD=30\n", contents)
+        self.assertNotIn("MAX_RANKS=", contents)
+        self.assertIn("OXINSIDER_API_KEY=fake-test-key", contents)
+        self.assertEqual(path.stat().st_mode & 0o777, 0o600)
 
     def test_mismatched_and_stale_dates_do_not_buy(self):
         row = pick_data()

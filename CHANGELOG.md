@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.3.2
+
+- All 10 published slots are eligible for the same `STAKE_USD` by default. Existing explicit
+  `MIN_RANKS` and `MAX_RANKS` settings remain in force until their owner removes them.
+- When the cap cannot cover every eligible pick, buy in release-time order, using token ID to
+  break ties; log each cap skip. Rank identifies a pick but does not set its stake or priority.
+- `init` asks for unit size and daily cap, showing the cost of 10 picks. `size` lets an existing
+  stopped setup change both interactively. `status`, `run`, and `watch` report budget capacity.
+- The default `DAILY_CAP_USD=25` remains unchanged, so an existing configuration does not gain
+  spending authority. At a 5 pUSD unit, it covers five picks; choose 50 pUSD to cover ten.
+
 ## 0.3.1
 
 - Accept slates of up to 10 picks. 0xinsider raised the daily maximum from 6 to 10 on

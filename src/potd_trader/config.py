@@ -81,8 +81,8 @@ class Settings(BaseSettings):
     daily_cap_usd: Decimal = Field(default=Decimal("25"), gt=0)
     kickoff_buffer_minutes: int = Field(default=5, ge=0)
     min_ranks: int = Field(default=1, ge=1, le=MAX_DAILY_PICKS)
-    # Defaults to the top 6 of up to 10, as before the day grew; MAX_RANKS=10 buys every pick.
-    max_ranks: int = Field(default=6, ge=1, le=MAX_DAILY_PICKS)
+    # Explicit legacy ranges remain honored; new setups include every published slot.
+    max_ranks: int = Field(default=MAX_DAILY_PICKS, ge=1, le=MAX_DAILY_PICKS)
 
     # Files and cadence.
     ledger_path: Path = Field(default_factory=default_ledger_path)
@@ -126,6 +126,11 @@ class Settings(BaseSettings):
     @property
     def has_polymarket_credentials(self) -> bool:
         return self.polymarket_private_key is not None and bool(self.polymarket_wallet_address)
+
+    @property
+    def pick_capacity(self) -> int:
+        """Maximum whole stakes allowed by the daily principal cap before reservations."""
+        return int(self.daily_cap_usd // self.stake_usd) if self.stake_usd > 0 else 0
 
     def require_polymarket_credentials(self) -> None:
         if not self.has_polymarket_credentials:

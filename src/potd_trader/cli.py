@@ -13,11 +13,12 @@ from decimal import Decimal
 from pathlib import Path
 
 import httpx
+from dotenv import dotenv_values
 from polymarket import PolymarketError
 from pydantic import ValidationError
 
 from . import __version__
-from .config import Settings, active_env_file
+from .config import MAX_DAILY_PICKS, Settings, active_env_file
 from .control import LiveControl
 from .ledger import Ledger, LedgerError
 from .oxinsider import (
@@ -31,7 +32,16 @@ from .oxinsider import (
 )
 from .polymarket import Account, PublicReads, geoblock
 from .trader import Plan, execute, plan_slate
-from .wizard import LIVE_PHRASE, collect, confirm_live, require_tty, set_live
+from .wizard import (
+    LIVE_PHRASE,
+    ask_daily_cap,
+    ask_stake,
+    collect,
+    configure_size,
+    confirm_live,
+    require_tty,
+    set_live,
+)
 
 log = logging.getLogger("potd-trader")
 
@@ -60,6 +70,33 @@ def _mode_banner(settings: Settings) -> None:
         )
     else:
         log.info("DRY RUN: live control is disabled for this run. Plans are printed only.")
+
+
+def _budget_banner(settings: Settings, spent: Decimal) -> None:
+    remaining = max(Decimal("0"), settings.daily_cap_usd - spent)
+    remaining_picks = int(remaining // settings.stake_usd) if settings.stake_usd > 0 else 0
+    log.info(
+        "Unit size %s pUSD; daily cap %s pUSD covers %d pick(s), %d with current reservations "
+        "(up to %d may be published)",
+        settings.stake_usd,
+        settings.daily_cap_usd,
+        settings.pick_capacity,
+        remaining_picks,
+        MAX_DAILY_PICKS,
+    )
+    if settings.pick_capacity < MAX_DAILY_PICKS:
+        log.warning(
+            "Daily cap cannot fund all %d picks at this unit size. Run `potd-trader size` "
+            "to choose a different limit.",
+            MAX_DAILY_PICKS,
+        )
+    if settings.min_ranks != 1 or settings.max_ranks != MAX_DAILY_PICKS:
+        log.warning(
+            "Legacy MIN_RANKS=%d MAX_RANKS=%d excludes some picks. Remove those lines from .env "
+            "to include every rank.",
+            settings.min_ranks,
+            settings.max_ranks,
+        )
 
 
 def _fmt_time(value: datetime | None) -> str:
@@ -189,6 +226,7 @@ def _handle_result(
 def cmd_run(settings: Settings) -> int:
     _mode_banner(settings)
     ledger = Ledger(settings.ledger_path)
+    _budget_banner(settings, ledger.spent_today_usd())
     client = OxinsiderClient(
         settings.oxinsider_api_base, settings.oxinsider_api_key.get_secret_value()
     )
@@ -225,6 +263,7 @@ def cmd_watch(settings: Settings) -> int:
         }
     )
     _mode_banner(settings)
+    _budget_banner(settings, Ledger(settings.ledger_path).spent_today_usd())
     log.info("Watching. Ctrl-C stops it. Nothing is polled faster than the server asks for.")
     client = OxinsiderClient(
         settings.oxinsider_api_base, settings.oxinsider_api_key.get_secret_value()
@@ -270,6 +309,9 @@ def cmd_watch(settings: Settings) -> int:
 def cmd_status(settings: Settings) -> int:
     """Region, account, approvals, balance, ledger. Non-zero when the account cannot be opened."""
     _mode_banner(settings)
+    ledger = Ledger(settings.ledger_path)
+    spent = ledger.spent_today_usd()
+    _budget_banner(settings, spent)
     geo = geoblock()
     log.info(
         "Polymarket geoblock: %s (%s %s)",
@@ -296,12 +338,11 @@ def cmd_status(settings: Settings) -> int:
                 account.close()
     else:
         log.info("Polymarket credentials not configured; only dry runs are possible.")
-    ledger = Ledger(settings.ledger_path)
     entries = ledger.entries()
     log.info("Ledger %s: %d order(s)", ledger.path, len(entries))
     log.info(
         "UTC budget reserved: %s / %s pUSD (includes unresolved older orders)",
-        ledger.spent_today_usd(),
+        spent,
         settings.daily_cap_usd,
     )
     unresolved = sum(entry["state"] in {"submitting", "unknown"} for _, entry in entries)
@@ -370,6 +411,37 @@ def cmd_init(directory: Path) -> int:
     return 0
 
 
+def cmd_size(settings: Settings) -> int:
+    """Interactively change unit size and cap in an existing, stopped setup."""
+    require_tty()
+    path = settings.control_env_path
+    if not path.is_file() or dotenv_values(path, interpolate=False).get("LIVE") != "no":
+        raise SystemExit("Run `potd-trader live off` before changing sizing in an existing .env.")
+    log.info(
+        "Current unit size %s pUSD; daily cap %s pUSD.", settings.stake_usd, settings.daily_cap_usd
+    )
+    stake = ask_stake(str(settings.stake_usd), "1/2")
+    cap = ask_daily_cap(stake, str(settings.daily_cap_usd), "2/2")
+    include_all = False
+    if settings.min_ranks != 1 or settings.max_ranks != MAX_DAILY_PICKS:
+        log.warning(
+            "Current rank range excludes picks outside %d..%d.",
+            settings.min_ranks,
+            settings.max_ranks,
+        )
+        include_all = (
+            input("     Remove the legacy rank filter and include every pick? Type yes: ").strip()
+            == "yes"
+        )
+    configure_size(path, stake, cap, include_all=include_all)
+    log.info(
+        "Saved unit size %s pUSD and daily cap %s pUSD. Restart any watcher; run a dry run first.",
+        stake,
+        cap,
+    )
+    return 0
+
+
 def cmd_live(state: str) -> int:
     path = active_env_file()
     if not path.exists():
@@ -429,7 +501,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")
     sub = parser.add_subparsers(dest="command", required=True)
     init = sub.add_parser(
-        "init", help="create a folder, ask 4 questions, then run status and a dry run"
+        "init", help="create a folder, ask 5 questions, then run status and a dry run"
     )
     init.add_argument(
         "directory",
@@ -439,6 +511,9 @@ def main(argv: list[str] | None = None) -> int:
         help="the new folder to create (default: ./potd-trader); it must not exist yet",
     )
     sub.add_parser("status", help="check region, account, approvals, balance and the ledger")
+    sub.add_parser(
+        "size", help="interactively set per-pick unit size and daily cap while live is off"
+    )
     sub.add_parser("setup", help="set trading approvals once (needs a Relayer API key)")
     run = sub.add_parser("run", help="read today's picks and buy each one at most once, then exit")
     watch = sub.add_parser("watch", help="wake for each release and buy as picks appear")
@@ -462,6 +537,7 @@ def main(argv: list[str] | None = None) -> int:
 
     commands = {
         "status": cmd_status,
+        "size": cmd_size,
         "setup": cmd_setup,
         "run": cmd_run,
         "watch": cmd_watch,

@@ -13,8 +13,11 @@ import sys
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
+from dotenv import dotenv_values
+
+from .config import MAX_DAILY_PICKS
 from .control import LiveControl
-from .storage import atomic_write
+from .storage import atomic_write, file_lock
 
 LIVE_PHRASE = "spend real money"
 _HEX_KEY = re.compile(r"^(0x)?[0-9a-fA-F]{64}$")
@@ -28,8 +31,8 @@ def say(text: str = "") -> None:
 def require_tty() -> None:
     if not sys.stdin.isatty():
         raise SystemExit(
-            "potd-trader init is interactive: run it in a terminal. An agent setting this up "
-            "for someone follows AGENTS.md instead."
+            "This command is interactive: run it in a terminal. An agent setting this up for "
+            "someone follows AGENTS.md instead."
         )
 
 
@@ -78,10 +81,10 @@ def ask_wallet_address() -> str:
         say("     an address is 0x followed by 40 hex characters. Try again.")
 
 
-def ask_stake() -> str:
-    say("4/4  pUSD per pick. Start small.")
+def ask_stake(default: str = "5", step: str = "4/5") -> str:
+    say(f"{step}  Unit size in pUSD per pick. Every eligible pick uses this amount.")
     while True:
-        value = _ask("     STAKE_USD", secret=False, default="5")
+        value = _ask("     STAKE_USD", secret=False, default=default)
         try:
             stake = Decimal(value)
         except InvalidOperation:
@@ -89,6 +92,24 @@ def ask_stake() -> str:
         if stake.is_finite() and stake > 0:
             return str(stake)
         say("     a positive number, like 5. Try again.")
+
+
+def ask_daily_cap(stake: str, default: str | None = None, step: str = "5/5") -> str:
+    full_day = Decimal(stake) * MAX_DAILY_PICKS
+    say(f"{step}  Daily principal limit.")
+    say(f"     {MAX_DAILY_PICKS} picks at {stake} pUSD need {full_day} pUSD.")
+    say("     Fees are additional. A lower cap skips picks once its budget is used.")
+    while True:
+        value = _ask("     DAILY_CAP_USD", secret=False, default=default or str(full_day))
+        try:
+            cap = Decimal(value)
+        except InvalidOperation:
+            cap = Decimal("-1")
+        if cap.is_finite() and cap > 0:
+            capacity = int(cap // Decimal(stake))
+            say(f"     At this unit size, the cap covers up to {capacity} pick(s).")
+            return str(cap)
+        say("     a positive number, like 50. Try again.")
 
 
 def write_env(path: Path, values: dict[str, str]) -> None:
@@ -140,7 +161,7 @@ def collect(directory: Path) -> Path:
     require_tty()
     folder = prepare_folder(directory)
     target = folder / ".env"
-    say("potd-trader setup. Four questions, then a dry run. Nothing is bought.")
+    say("potd-trader setup. Five questions, then a dry run. Nothing is bought.")
     say(f"New folder: {folder}")
     say("Your keys go in its .env (mode 600) and nowhere else.")
     say()
@@ -149,10 +170,30 @@ def collect(directory: Path) -> Path:
         "POLYMARKET_PRIVATE_KEY": ask_private_key(),
         "POLYMARKET_WALLET_ADDRESS": ask_wallet_address(),
         "STAKE_USD": ask_stake(),
-        "LIVE": "no",
     }
+    values["DAILY_CAP_USD"] = ask_daily_cap(values["STAKE_USD"])
+    values["LIVE"] = "no"
     write_env(target, values)
     say()
     say(f"Written: {target}")
     say()
     return folder
+
+
+def configure_size(path: Path, stake: str, cap: str, *, include_all: bool = False) -> None:
+    """Change only sizing fields, preserving secrets and all other settings."""
+    control = LiveControl(path)
+    with file_lock(control.lock_path):
+        if not path.is_file() or dotenv_values(path, interpolate=False).get("LIVE") != "no":
+            raise ValueError("run `potd-trader live off` before changing sizing")
+        lines = path.read_text(encoding="utf-8").splitlines()
+        removed = {"STAKE_USD", "DAILY_CAP_USD"}
+        if include_all:
+            removed.update({"MIN_RANKS", "MAX_RANKS"})
+        kept = [
+            line
+            for line in lines
+            if line.split("=", 1)[0].strip().removeprefix("export ").strip() not in removed
+        ]
+        kept.extend((f"STAKE_USD={stake}", f"DAILY_CAP_USD={cap}"))
+        atomic_write(path, "\n".join(kept) + "\n")
