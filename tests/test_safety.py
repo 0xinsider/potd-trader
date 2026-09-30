@@ -402,10 +402,23 @@ class SafetyTests(unittest.TestCase):
         tied = self.plans(Pick.model_validate(late_rank_one), Pick.model_validate(early_rank_ten))
         self.assertEqual([plan.pick.pick_rank for plan in tied], [10, 1])
 
-    def test_explicit_legacy_rank_range_still_restricts_trading(self):
-        self.settings = self.settings.model_copy(update={"max_ranks": 6})
-        high = Pick.model_validate(pick_data(10, "110"))
-        self.assertIn("outside MIN_RANKS..MAX_RANKS", self.plans(high)[0].reason)
+    def test_legacy_rank_settings_do_not_restrict_trading(self):
+        before = Path.cwd()
+        self.addCleanup(os.chdir, before)
+        (self.folder / ".env").write_text(
+            "LIVE=no\nOXINSIDER_API_KEY=fake-test-key\nMIN_RANKS=1\nMAX_RANKS=6\n"
+        )
+        os.chdir(self.folder)
+        self.settings = Settings.load().model_copy(update={"daily_cap_usd": D("50")})
+        picks = tuple(
+            Pick.model_validate(pick_data(rank, str(100 + rank))) for rank in range(1, 11)
+        )
+        self.assertTrue(all(plan.buy for plan in self.plans(*picks)))
+        self.assertEqual(picks[-1].label, "token 110")
+        self.assertEqual(
+            picks[-1].model_copy(update={"matchup": "A vs B", "pick_outcome_label": "A"}).label,
+            "A (A vs B)",
+        )
 
     def test_watcher_plans_later_rank_ten_release_in_dry_run(self):
         now = datetime.now(UTC)
@@ -445,15 +458,23 @@ class SafetyTests(unittest.TestCase):
         path = self.folder / ".env"
         path.write_text("LIVE=yes\nOXINSIDER_API_KEY=fake-test-key\nMAX_RANKS=6\nSTAKE_USD=5\n")
         with self.assertRaisesRegex(ValueError, "live off"):
-            configure_size(path, "3", "30", include_all=True)
+            configure_size(path, "3", "30")
         LiveControl(path).set_live(False)
-        configure_size(path, "3", "30", include_all=True)
+        configure_size(path, "3", "30")
         contents = path.read_text()
         self.assertIn("STAKE_USD=3\n", contents)
         self.assertIn("DAILY_CAP_USD=30\n", contents)
         self.assertNotIn("MAX_RANKS=", contents)
         self.assertIn("OXINSIDER_API_KEY=fake-test-key", contents)
         self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+
+    def test_ledger_output_hides_stored_legacy_rank_label(self):
+        self.assertIsNone(self.reserve(label="#1 A (A vs B)"))
+        with self.assertLogs("potd-trader", level="INFO") as logs:
+            self.assertEqual(cli.cmd_ledger(self.settings), 0)
+        output = "\n".join(logs.output)
+        self.assertIn("A (A vs B)", output)
+        self.assertNotIn("#1 ", output)
 
     def test_mismatched_and_stale_dates_do_not_buy(self):
         row = pick_data()
@@ -540,7 +561,6 @@ class SafetyTests(unittest.TestCase):
             dict(stake_usd="Infinity"),
             dict(max_slippage_pct="-1"),
             dict(kickoff_buffer_minutes=-1),
-            dict(min_ranks=6, max_ranks=1),
             dict(watch_idle_minutes=0),
         ]:
             with self.subTest(fields=fields), self.assertRaises(ValidationError):

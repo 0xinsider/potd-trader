@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.3.3
+
+- Remove `MIN_RANKS` and `MAX_RANKS`: old values are ignored, and no released pick is skipped
+  because of its slot number. Pick and ledger labels no longer display a rank. The API's slot is
+  still used internally to reject duplicate or changed-slot orders until its rank-free identity
+  contract is delivered in 0xinsider/0xinsider#19968.
+- `size` removes obsolete rank lines from `.env`. `status`, `run`, and `watch` warn when they find
+  those lines or inherited variables. Price, market, kickoff, live-control, duplicate, and daily
+  spending-cap guards are unchanged; a 25 pUSD cap still funds five 5 pUSD picks.
+
 ## 0.3.2
 
 - All 10 published slots are eligible for the same `STAKE_USD` by default. Existing explicit

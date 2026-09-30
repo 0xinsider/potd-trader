@@ -66,8 +66,6 @@ def plan_pick(
         return skip("no CLOB token id on this pick")
     if pick.game_started:
         return skip("game already started; the pre-game price is gone")
-    if not settings.min_ranks <= pick.pick_rank <= settings.max_ranks:
-        return skip(f"rank {pick.pick_rank} is outside MIN_RANKS..MAX_RANKS")
     if ledger.blocks(
         pick.key, pick_date=pick.pick_date, pick_rank=pick.pick_rank, token_id=pick.token_id
     ):

@@ -73,9 +73,11 @@ class Pick(BaseModel):
 
     @property
     def label(self) -> str:
-        side = self.pick_outcome_label or self.position or "?"
-        game = self.matchup or self.event_slug or "?"
-        return f"#{self.pick_rank} {side} ({game})"
+        side = self.pick_outcome_label or self.position
+        game = self.matchup or self.event_slug
+        if side and game:
+            return f"{side} ({game})"
+        return side or game or f"token {self.token_id or 'unknown'}"
 
 
 class ScheduledSlot(BaseModel):

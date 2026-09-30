@@ -43,8 +43,9 @@ recalling a signature.
    `clob.polymarket.com`, `gamma-api.polymarket.com`, and `polymarket.com/api/geoblock`, and the
    README's "What leaves your machine" table also discloses the SDK's existing
    `polygon.drpc.org` approval reads and `relayer-v2.polymarket.com` wallet/relayer calls. A new one changes that promise.
-7. Never widen a guard to make a buy happen. `MAX_PRICE`, `MAX_SLIPPAGE_PCT`, `DAILY_CAP_USD`,
-   and `KICKOFF_BUFFER_MINUTES` are the person's settings; explain a skip, do not route around it.
+7. Never widen a price, budget, or timing guard to make a buy. `MAX_PRICE`,
+   `MAX_SLIPPAGE_PCT`, `DAILY_CAP_USD`, and `KICKOFF_BUFFER_MINUTES` are the person's settings;
+   explain a skip, do not route around it. Rank is not a trade guard.
 8. No emojis anywhere. Safety behavior changes require deterministic tests with a fake exchange
    that cannot submit real orders. Include concurrency, crashes, duplicate picks, budget, and stop
    boundaries. A successful live-route dry run alone does not prove these properties.
@@ -58,7 +59,7 @@ creates a fresh folder, asks 5 questions (keys with echo off), and needs a termi
 have. Offer it first:
 
 ```bash
-git clone --branch v0.3.2 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.3 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init

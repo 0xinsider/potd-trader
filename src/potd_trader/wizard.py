@@ -180,16 +180,14 @@ def collect(directory: Path) -> Path:
     return folder
 
 
-def configure_size(path: Path, stake: str, cap: str, *, include_all: bool = False) -> None:
+def configure_size(path: Path, stake: str, cap: str) -> None:
     """Change only sizing fields, preserving secrets and all other settings."""
     control = LiveControl(path)
     with file_lock(control.lock_path):
         if not path.is_file() or dotenv_values(path, interpolate=False).get("LIVE") != "no":
             raise ValueError("run `potd-trader live off` before changing sizing")
         lines = path.read_text(encoding="utf-8").splitlines()
-        removed = {"STAKE_USD", "DAILY_CAP_USD"}
-        if include_all:
-            removed.update({"MIN_RANKS", "MAX_RANKS"})
+        removed = {"STAKE_USD", "DAILY_CAP_USD", "MIN_RANKS", "MAX_RANKS"}
         kept = [
             line
             for line in lines
