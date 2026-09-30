@@ -1,13 +1,14 @@
 """`potd-trader init`: one terminal session from nothing to a checked dry run.
 
 It creates a new folder and never writes into an existing one. Keys are typed with echo off and
-written straight to the folder's `.env` at mode 0600. Nothing here prints a key, and nothing here
+written straight to the folder's `.env` in a private folder. Nothing here prints a key or
 sets `LIVE=yes` without the person typing the confirmation phrase.
 """
 
 from __future__ import annotations
 
 import getpass
+import os
 import re
 import sys
 from decimal import Decimal, InvalidOperation
@@ -163,7 +164,10 @@ def collect(directory: Path) -> Path:
     target = folder / ".env"
     say("potd-trader setup. Five questions, then a dry run. Nothing is bought.")
     say(f"New folder: {folder}")
-    say("Your keys go in its .env (mode 600) and nowhere else.")
+    if os.name == "nt":
+        say("Your keys stay in its .env. Keep this folder in your private Windows user folder.")
+    else:
+        say("Your keys go in its .env (mode 600) and nowhere else.")
     say()
     values = {
         "OXINSIDER_API_KEY": ask_oxinsider_key(),

@@ -10,8 +10,36 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      POTD_TRADER_HOME: ${{ github.workspace }}/.runtime-config
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
-      - run: ./scripts/pre-merge-check.sh
+        with:
+          python-version: "3.12.14"
+      - run: uv sync --locked
+      - run: uv run --locked ruff check src
+      - run: uv run --locked ruff format --check src
+      - run: uv run --locked mypy src
+      - run: uv run --locked python -m compileall -q src
+      - run: uv run --locked potd-trader --help
+      - run: uv run --locked potd-trader --version
+      - name: Prepare a stopped local configuration without wallet credentials
+        run: >-
+          uv run --locked python -c "import os; from pathlib import Path;
+          from potd_trader.wizard import prepare_folder, write_env;
+          folder = prepare_folder(Path(os.environ['POTD_TRADER_HOME']));
+          write_env(folder / '.env', {'LIVE': 'no', 'OXINSIDER_API_KEY': 'offline-placeholder'})"
+      - run: uv run --locked potd-trader live off
+      - run: uv run --locked potd-trader live status
+      - run: uv run --locked potd-trader ledger
+      - name: Load the pick's New York timezone
+        run: >-
+          uv run --locked python -c "from zoneinfo import ZoneInfo;
+          print(ZoneInfo('America/New_York').key)"
+      - run: uv build

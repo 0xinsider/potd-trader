@@ -1,10 +1,10 @@
 [project]
 name = "potd-trader"
-version = "0.3.3"
+version = "0.3.4"
 description = "Buy the 0xinsider Pick of the Day on your own Polymarket account. Your keys stay on your machine."
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.12"
+requires-python = ">=3.12.4"
 authors = [{ name = "0xinsider", email = "support@0xinsider.com" }]
 keywords = ["polymarket", "0xinsider", "pick-of-the-day", "sports", "prediction-markets"]
 dependencies = [
@@ -14,6 +14,8 @@ dependencies = [
     "pydantic>=2,<3",
     "pydantic-settings>=2,<3",
     "python-dotenv>=1.2,<2",
+    "portalocker[win32]==4.4.0",
+    "tzdata>=2024.1; sys_platform == 'win32'",
 ]
 
 [project.urls]
