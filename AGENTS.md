@@ -16,7 +16,7 @@ Modules under `src/potd_trader/`:
 | `ledger.py` | locked, durable JSON reservations for identity and local UTC budget before posting |
 | `control.py`, `storage.py` | authoritative live stop, submission barrier, and durable local files |
 | `config.py` | the current directory's `.env` (fallback `~/.potd-trader/.env`) to `Settings`; both keys are `SecretStr` |
-| `wizard.py` | `init`: a NEW folder (never an existing one), 5 questions with echo off for keys, `.env` at 0600, the `LIVE` phrase; `size`: existing stopped setup |
+| `wizard.py` | `init`: a NEW private folder, 5 questions with echo off for keys, the `LIVE` phrase; `size`: existing stopped setup |
 | `cli.py` | `init`, `size`, `status`, `setup`, `run`, `watch`, `live`, `ledger` |
 
 Contracts to read before changing a call: the endpoint,
@@ -59,7 +59,7 @@ creates a fresh folder, asks 5 questions (keys with echo off), and needs a termi
 have. Offer it first:
 
 ```bash
-git clone --branch v0.3.3 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
@@ -67,9 +67,10 @@ uv run --locked potd-trader init
 
 If they would rather you drive, do these in order and stop where it says stop.
 
-1. `uv sync --locked` (needs Python 3.12+ and `uv`; install `uv` from <https://docs.astral.sh/uv/> if
+1. `uv sync --locked` (needs Python 3.12.4+ and `uv`; install `uv` from <https://docs.astral.sh/uv/> if
    missing).
-2. `cp .env.example .env && chmod 600 .env`.
+2. On macOS/Linux: `cp .env.example .env && chmod 600 .env`. On Windows, prefer `init`; manual
+   setup uses `Copy-Item .env.example .env` inside a folder restricted to the user and administrators.
 3. Tell them the 3 values to fill in, in one short message:
    - `OXINSIDER_API_KEY`: a live key (`oxi_sk_live_...`) from <https://0xinsider.com/developers>.
      The pick endpoint needs Pro.

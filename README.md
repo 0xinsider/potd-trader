@@ -10,25 +10,48 @@ Your wallet key signs locally through the official Polymarket SDK.
 
 ## Install a version with locked dependencies
 
-Python 3.12+ and [uv](https://docs.astral.sh/uv/) are required. Supported systems: macOS and
-Linux, including WSL. The process locks require a local filesystem, not NFS or a synced folder.
+Python 3.12.4+ and [uv](https://docs.astral.sh/uv/) are required. Supported systems: Windows
+with x64 Python, macOS and Linux, including WSL. Keep the configuration and ledger on a local
+filesystem, outside OneDrive, other synced folders and network drives.
 
 ```bash
-git clone --branch v0.3.3 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
 ```
 
-The [v0.3.3 release](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.3) identifies the
+On Windows, install Git and uv from PowerShell, then reopen your terminal:
+
+```powershell
+winget install --id Git.Git --exact
+winget install --id astral-sh.uv --exact
+```
+
+In the new PowerShell window, use a local folder under your Windows profile:
+
+```powershell
+Set-Location $env:USERPROFILE
+git clone --branch v0.3.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+Set-Location potd-trader-src
+uv sync --locked --python 3.12
+uv run --locked potd-trader init
+```
+
+uv installs Python if needed. WSL is optional; native Windows uses the same commands and ledger
+format. Use x64 Python on Windows; native ARM64 Python is not covered by this release.
+
+The [v0.3.4 release](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.4) identifies the
 merged commit and includes SHA-256 checksums for its package artifacts. For an immutable source
 pin, check out that full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
 an unversioned Git URL or a package without its lockfile does not reproduce that environment.
 
 `init` creates a new `potd-trader/` folder inside the checkout. It asks five questions, hides both
-keys as you type, writes `.env` at mode 600 in a mode 700 folder, and runs account checks and a
-forced dry run. An inherited `LIVE=yes` cannot make this setup run buy. Only the final confirmation
+keys as you type, creates a private folder, and runs account checks and a forced dry run.
+On macOS/Linux the folder is mode 700 and `.env` is mode 600. On Windows, the new folder limits
+access to your user and administrators; files inherit its permissions. An inherited `LIVE=yes`
+cannot make this setup run buy. Only the final confirmation
 can enable subsequent live commands. An existing folder is never overwritten. The last two
 questions set your unit size per pick and daily cap; the cap prompt shows the cost of all 10.
 
@@ -68,6 +91,10 @@ Inside the versioned checkout:
 cp .env.example .env
 chmod 600 .env
 ```
+
+On Windows, prefer `init` so it creates the private folder. If setting up by hand, use
+`Copy-Item .env.example .env` in a folder whose Windows Security permissions allow only your
+account and administrators. `chmod` does not set Windows access permissions.
 
 Fill in these values locally; never paste keys into a chat:
 
@@ -200,20 +227,26 @@ Build from the release checkout. Mount the configuration folder so `live off` on
 container see the same control file and ledger. Never bake secrets into the image.
 
 ```bash
-docker build -t potd-trader:0.3.0 .
-docker run --rm -v "$PWD/potd-trader:/app/data" potd-trader:0.3.0
+docker build -t potd-trader:0.3.4 .
+docker run --rm -v "$PWD/potd-trader:/app/data" potd-trader:0.3.4
 ```
 
 ## Verification and limits
 
-```bash
-./scripts/pre-merge-check.sh
-```
+The Check workflow installs locked dependencies, runs lint, formatting and strict source typing,
+compiles the source, builds packages, and exercises CLI help, version, local setup, `live off`,
+`live status`, an empty ledger and New York timezone loading on Windows, macOS and Linux.
+These checks use no wallet credentials and submit no orders. Historical fake-exchange cases
+remain in the repository; they are not run by this workflow or claimed as Windows evidence.
 
-The gate runs lint, formatting, strict source typing, fake-exchange safety tests, and CLI checks.
-The tests exercise competing processes, crash recovery, duplicate picks, UTC budgets, stop timing,
-malformed feeds, and credential routing without wallet keys or real submissions. A public SDK/book
-read checks provider compatibility separately. Neither proves future feed integrity or profit.
+Atomic writes flush file content before replacement. macOS/Linux also flush the parent directory;
+Windows does not, so sudden power loss can lose a recent replacement. After a power failure,
+stop trading and compare the ledger with Polymarket Activity before resuming. Never run the same
+wallet from Windows and WSL, separate machines, containers or separate ledger copies at once.
+
+Stop every old watcher before upgrading, including any WSL or container process. Preserve the
+configuration folder and ledger, then check `live status` and `run --dry-run` with the new version.
+Only you enable live orders. Platform checks do not prove future feed integrity or profit.
 
 Orders spend real money and cannot be undone. Polymarket regional restrictions apply. This tool
 is MIT licensed, with no warranty; 0xinsider does not operate or custody your wallet.

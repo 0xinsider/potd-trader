@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.4
+
+- Run natively on Windows with x64 Python 3.12.4+, uv and PowerShell. WSL is optional; Windows,
+  macOS and Linux use the same CLI, settings and ledger format.
+- Use cross-platform process locks and flushed atomic writes. Windows uses Win32 locks that
+  keep waiting during a long submission; only macOS/Linux flush the parent directory too.
+- Include timezone data for New York pick-date checks on Windows. Setup explains Windows
+  folder permissions instead of claiming POSIX file modes.
+- Check locked installation, lint, formatting, typing, compilation, packaging, local stop
+  commands, ledger access and timezone loading on native Windows, macOS and Linux.
+- Add PowerShell setup and upgrade instructions. Stop all old watchers before upgrading and
+  preserve the shared ledger. Price, budget, timing, duplicate and live-mode guards are unchanged.
+
 ## 0.3.3
 
 - Remove `MIN_RANKS` and `MAX_RANKS`: old values are ignored, and no released pick is skipped

@@ -16,6 +16,7 @@ from pathlib import Path
 import httpx
 from dotenv import dotenv_values
 from polymarket import PolymarketError
+from portalocker.exceptions import BaseLockException
 from pydantic import ValidationError
 
 from . import __version__
@@ -559,7 +560,7 @@ def main(argv: list[str] | None = None) -> int:
     except (OxinsiderError, LedgerError) as exc:
         log.error("%s", exc)
         return 1
-    except (httpx.HTTPError, PolymarketError, OSError, ValueError) as exc:
+    except (httpx.HTTPError, PolymarketError, BaseLockException, OSError, ValueError) as exc:
         log.error(
             "Command stopped (%s). Check configuration/network and ledger before retrying.",
             type(exc).__name__,
