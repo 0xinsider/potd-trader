@@ -34,7 +34,7 @@ In the new PowerShell window, use a local folder under your Windows profile:
 Set-Location $env:USERPROFILE
 git clone --branch v0.3.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 Set-Location potd-trader-src
-uv sync --locked --python 3.12
+uv sync --locked --python ">=3.12.4,<3.13"
 uv run --locked potd-trader init
 ```
 
