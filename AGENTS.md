@@ -16,8 +16,8 @@ Modules under `src/potd_trader/`:
 | `ledger.py` | locked, durable JSON reservations for identity and local UTC budget before posting |
 | `control.py`, `storage.py` | authoritative live stop, submission barrier, and durable local files |
 | `config.py` | the current directory's `.env` (fallback `~/.potd-trader/.env`) to `Settings`; both keys are `SecretStr` |
-| `wizard.py` | `init`: a NEW folder (never an existing one), the 4 questions with echo off, `.env` at 0600, the `LIVE` phrase |
-| `cli.py` | `init`, `status`, `setup`, `run`, `watch`, `live`, `ledger` |
+| `wizard.py` | `init`: a NEW folder (never an existing one), 5 questions with echo off for keys, `.env` at 0600, the `LIVE` phrase; `size`: existing stopped setup |
+| `cli.py` | `init`, `size`, `status`, `setup`, `run`, `watch`, `live`, `ledger` |
 
 Contracts to read before changing a call: the endpoint,
 <https://docs.0xinsider.com/api-reference/endpoint/get-pick-of-the-day>; the SDK,
@@ -54,11 +54,11 @@ recalling a signature.
 ## Setting it up for a person
 
 The person wants it running in minutes. The fastest path is theirs, not yours: `potd-trader init`
-creates a fresh folder, asks the 4 questions with echo off, and needs a terminal, which you do not
+creates a fresh folder, asks 5 questions (keys with echo off), and needs a terminal, which you do not
 have. Offer it first:
 
 ```bash
-git clone --branch v0.3.0 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.2 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
@@ -84,7 +84,7 @@ If they would rather you drive, do these in order and stop where it says stop.
 5. `uv run --locked potd-trader run --dry-run`: a dry run. Explain each `BUY` and `SKIP` line. A 404
    with `Earliest change:` is the schedule, not an error; say when the next pick can appear.
 6. Stop. Say that `potd-trader live on` is theirs to run, that
-   `STAKE_USD` starts at 5, and that `potd-trader watch` keeps it running. Do not run `live on`,
+   `STAKE_USD` starts at 5, the cap covers five such picks unless changed, and `potd-trader watch` keeps it running. Do not run `live on`,
    do not make the edit, and do not start `watch`.
 
 ## Verification

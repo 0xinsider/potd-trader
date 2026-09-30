@@ -14,22 +14,23 @@ Python 3.12+ and [uv](https://docs.astral.sh/uv/) are required. Supported system
 Linux, including WSL. The process locks require a local filesystem, not NFS or a synced folder.
 
 ```bash
-git clone --branch v0.3.1 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.2 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
 ```
 
-The [v0.3.1 release](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.1) identifies the
+The [v0.3.2 release](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.2) identifies the
 merged commit and includes SHA-256 checksums for its package artifacts. For an immutable source
 pin, check out that full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
 an unversioned Git URL or a package without its lockfile does not reproduce that environment.
 
-`init` creates a new `potd-trader/` folder inside the checkout. It asks four questions, hides both
+`init` creates a new `potd-trader/` folder inside the checkout. It asks five questions, hides both
 keys as you type, writes `.env` at mode 600 in a mode 700 folder, and runs account checks and a
 forced dry run. An inherited `LIVE=yes` cannot make this setup run buy. Only the final confirmation
-can enable subsequent live commands. An existing folder is never overwritten.
+can enable subsequent live commands. An existing folder is never overwritten. The last two
+questions set your unit size per pick and daily cap; the cap prompt shows the cost of all 10.
 
 From that new folder, `uv` finds the project in its parent directory:
 
@@ -82,6 +83,13 @@ uv run --locked potd-trader status
 uv run --locked potd-trader run --dry-run
 ```
 
+For an existing setup, stop its watcher, run `potd-trader live off`, then run
+`uv run --locked potd-trader size` inside the configuration folder. Type your unit size and daily
+cap; the command preserves keys and other settings. If old `MIN_RANKS` or `MAX_RANKS` lines still
+restrict picks, it offers to remove them. Run `status` and a dry run, then restart the watcher.
+Only you can turn live trading back on. A one-shot `run` sees picks already released; `watch`
+wakes for later releases.
+
 An agent must read [AGENTS.md](AGENTS.md), keep secrets out of output, run only these read/dry-run
 checks, and leave enabling live orders to you. `status` reports region, account, approvals,
 balance, reserved UTC budget, and unresolved orders. Missing approvals require `setup` with a
@@ -130,6 +138,13 @@ fees are additional: `STAKE_USD` and `DAILY_CAP_USD` bound order principal, not 
 `watch` honors `Retry-After`, release times, and `proof_pending_picks[].retry_at`. Read transport
 failures receive bounded backoff with a visible warning; an ambiguous order does not get retried.
 
+Every released, otherwise eligible pick uses the same unit size. Rank identifies a pick and helps
+block duplicate orders; it does not change stake. If the remaining cap funds only some picks, the
+trader considers the earliest released eligible picks first, breaking simultaneous-release ties
+by token ID. It prints each cap skip. The default 25 pUSD cap funds five 5 pUSD picks, not all 10;
+set 50 pUSD explicitly if you want capacity for 10. Existing rank filters remain in force until
+you remove them, and `status`, `run`, and `watch` warn when capacity is below 10.
+
 ## Ledger and recovery
 
 `ledger.json` beside `.env` records local submission timestamps, pick identities, reserved stakes,
@@ -172,7 +187,7 @@ active `.env` control file containing `LIVE=yes`; keys may still come from the e
 | `MAX_SLIPPAGE_PCT` | `3` | maximum increase over the published backed price |
 | `DAILY_CAP_USD` | `25` | positive ceiling on UTC order principal plus unresolved prior intents |
 | `KICKOFF_BUFFER_MINUTES` | `5` | stop buying this far before kickoff or authorization expiry |
-| `MIN_RANKS` / `MAX_RANKS` | `1` / `6` | inclusive ranked slots; a day carries up to 10 picks, so `MAX_RANKS=10` buys every one |
+| `MIN_RANKS` / `MAX_RANKS` | `1` / `10` | optional legacy rank restrictions; omit both to include every slot |
 | `LEDGER_PATH` | `ledger.json` beside `.env` | shared durable order state |
 | `POTD_TRADER_HOME` | `~/.potd-trader` | fallback configuration folder |
 | `WATCH_IDLE_MINUTES` | `30` | idle recheck cadence |

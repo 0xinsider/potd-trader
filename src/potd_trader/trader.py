@@ -164,7 +164,12 @@ def plan_slate(
         ]
     committed = ledger.spent_today_usd(now)
     plans: list[Plan] = []
-    for pick in sorted(slate.picks, key=lambda item: item.pick_rank):
+    # Spend scarce budget on the earliest released eligible picks. Rank is identity,
+    # not a preference; token breaks simultaneous-release ties independently of rank.
+    for pick in sorted(
+        slate.picks,
+        key=lambda item: (item.release_at or datetime.max.replace(tzinfo=UTC), item.token_id or ""),
+    ):
         plan = plan_pick(
             pick,
             settings=settings,
