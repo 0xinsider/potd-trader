@@ -18,7 +18,7 @@ import os
 from decimal import Decimal
 from pathlib import Path
 
-from pydantic import Field, SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # The most picks one product day carries; ranks run 1 to this. 0xinsider raised it from 6
@@ -80,9 +80,6 @@ class Settings(BaseSettings):
     max_slippage_pct: Decimal = Field(default=Decimal("3"), ge=0)
     daily_cap_usd: Decimal = Field(default=Decimal("25"), gt=0)
     kickoff_buffer_minutes: int = Field(default=5, ge=0)
-    min_ranks: int = Field(default=1, ge=1, le=MAX_DAILY_PICKS)
-    # Explicit legacy ranges remain honored; new setups include every published slot.
-    max_ranks: int = Field(default=MAX_DAILY_PICKS, ge=1, le=MAX_DAILY_PICKS)
 
     # Files and cadence.
     ledger_path: Path = Field(default_factory=default_ledger_path)
@@ -98,12 +95,6 @@ class Settings(BaseSettings):
     @classmethod
     def _api_origin(cls, value: str) -> str:
         return validate_api_origin(value)
-
-    @model_validator(mode="after")
-    def _rank_order(self) -> Settings:
-        if self.min_ranks > self.max_ranks:
-            raise ValueError("MIN_RANKS must not exceed MAX_RANKS")
-        return self
 
     @field_validator("stake_usd")
     @classmethod

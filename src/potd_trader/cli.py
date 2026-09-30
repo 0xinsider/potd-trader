@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
 import signal
 import sys
 import time
@@ -90,12 +91,16 @@ def _budget_banner(settings: Settings, spent: Decimal) -> None:
             "to choose a different limit.",
             MAX_DAILY_PICKS,
         )
-    if settings.min_ranks != 1 or settings.max_ranks != MAX_DAILY_PICKS:
+    legacy = {"MIN_RANKS", "MAX_RANKS"}
+    file_values = (
+        dotenv_values(settings.control_env_path, interpolate=False)
+        if settings.control_env_path.is_file()
+        else {}
+    )
+    if legacy.intersection(os.environ) or legacy.intersection(file_values):
         log.warning(
-            "Legacy MIN_RANKS=%d MAX_RANKS=%d excludes some picks. Remove those lines from .env "
-            "to include every rank.",
-            settings.min_ranks,
-            settings.max_ranks,
+            "MIN_RANKS and MAX_RANKS are obsolete and ignored. Every eligible pick is "
+            "considered; DAILY_CAP_USD still limits spending. Remove old rank lines from .env."
         )
 
 
@@ -422,20 +427,10 @@ def cmd_size(settings: Settings) -> int:
     )
     stake = ask_stake(str(settings.stake_usd), "1/2")
     cap = ask_daily_cap(stake, str(settings.daily_cap_usd), "2/2")
-    include_all = False
-    if settings.min_ranks != 1 or settings.max_ranks != MAX_DAILY_PICKS:
-        log.warning(
-            "Current rank range excludes picks outside %d..%d.",
-            settings.min_ranks,
-            settings.max_ranks,
-        )
-        include_all = (
-            input("     Remove the legacy rank filter and include every pick? Type yes: ").strip()
-            == "yes"
-        )
-    configure_size(path, stake, cap, include_all=include_all)
+    configure_size(path, stake, cap)
     log.info(
-        "Saved unit size %s pUSD and daily cap %s pUSD. Restart any watcher; run a dry run first.",
+        "Saved unit size %s pUSD and daily cap %s pUSD; removed obsolete rank settings. "
+        "Restart any watcher; run a dry run first.",
         stake,
         cap,
     )
@@ -480,11 +475,17 @@ def cmd_ledger(settings: Settings) -> int:
     if not entries:
         log.info("Ledger %s is empty.", settings.ledger_path)
         return 0
-    for key, entry in entries:
+    for _, entry in entries:
+        stored_label = entry.get("label")
+        label = (
+            re.sub(r"^#[0-9]+ ", "", stored_label)
+            if isinstance(stored_label, str)
+            else f"token {entry['token_id']}"
+        )
         log.info(
             "%-10s %s | %s pUSD | order %s | %s",
             entry.get("state"),
-            entry.get("label", key),
+            label,
             entry.get("stake_usd"),
             entry.get("order_id", "-"),
             entry.get("message") or entry.get("error") or entry.get("status") or "",
