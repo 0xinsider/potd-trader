@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.5 (Unreleased)
+
+- Prepare Pro and Max slate parsing for ranks through 20. Pro opens unresolved ranks 1 through
+  5; Max opens every available published rank up to 20. A day can publish fewer picks.
+- Show identity-free locked-rank metadata with a Max upgrade link. Locked rows never become
+  trade candidates; a successful empty slate clears the watcher's previous slate.
+- Preserve configured spending caps, the 25 pUSD settings default, the init suggestion of 10
+  stakes, and all price, timing, authorization, duplicate, ledger and live-mode guards.
+- Prepare matching 0.3.5 project, runtime and lock metadata without changing dependencies.
+  This version is held and not published; stop old watchers and preserve the shared ledger
+  before upgrading once the coordinated release is available.
+
 ## 0.3.4
 
 - Run natively on Windows with x64 Python 3.12.4+, uv and PowerShell. WSL is optional; Windows,

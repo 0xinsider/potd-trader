@@ -10,12 +10,16 @@ Your wallet key signs locally through the official Polymarket SDK.
 
 ## Install a version with locked dependencies
 
+This branch prepares **v0.3.5**, which is held and not published. The commands below are for its
+coordinated release and require that future tag. Published v0.3.4 accepts only ranks through 10;
+it does not support the Max 20-rank contract.
+
 Python 3.12.4+ and [uv](https://docs.astral.sh/uv/) are required. Supported systems: Windows
 with x64 Python, macOS and Linux, including WSL. Keep the configuration and ledger on a local
 filesystem, outside OneDrive, other synced folders and network drives.
 
 ```bash
-git clone --branch v0.3.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.5 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
@@ -32,7 +36,7 @@ In the new PowerShell window, use a local folder under your Windows profile:
 
 ```powershell
 Set-Location $env:USERPROFILE
-git clone --branch v0.3.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.5 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 Set-Location potd-trader-src
 uv sync --locked --python ">=3.12.4,<3.13"
 uv run --locked potd-trader init
@@ -41,9 +45,9 @@ uv run --locked potd-trader init
 uv installs Python if needed. WSL is optional; native Windows uses the same commands and ledger
 format. Use x64 Python on Windows; native ARM64 Python is not covered by this release.
 
-The [v0.3.4 release](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.4) identifies the
-merged commit and includes SHA-256 checksums for its package artifacts. For an immutable source
-pin, check out that full commit instead of a moving branch. `uv sync --locked` installs the
+Once v0.3.5 is published, use its [release page](https://github.com/0xinsider/potd-trader/releases)
+to verify the source commit and package checksums. For an immutable source pin, check out that
+full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
 an unversioned Git URL or a package without its lockfile does not reproduce that environment.
 
@@ -238,8 +242,8 @@ Build from the release checkout. Mount the configuration folder so `live off` on
 container see the same control file and ledger. Never bake secrets into the image.
 
 ```bash
-docker build -t potd-trader:0.3.4 .
-docker run --rm -v "$PWD/potd-trader:/app/data" potd-trader:0.3.4
+docker build -t potd-trader:0.3.5 .
+docker run --rm -v "$PWD/potd-trader:/app/data" potd-trader:0.3.5
 ```
 
 ## Verification and limits

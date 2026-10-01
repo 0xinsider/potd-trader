@@ -58,8 +58,11 @@ The person wants it running in minutes. The fastest path is theirs, not yours: `
 creates a fresh folder, asks 5 questions (keys with echo off), and needs a terminal, which you do not
 have. Offer it first:
 
+The v0.3.5 pin below is prepared but unpublished. Use it only after the coordinated release;
+published v0.3.4 retains the old 10-rank parser.
+
 ```bash
-git clone --branch v0.3.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.5 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
