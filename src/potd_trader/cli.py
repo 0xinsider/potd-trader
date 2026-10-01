@@ -204,6 +204,12 @@ def _handle_result(
         len(slate.picks),
         len(slate.scheduled),
     )
+    if slate.locked:
+        log.info(
+            "%d locked pick(s), ranks %s, require Max. Upgrade at https://0xinsider.com/pricing",
+            len(slate.locked),
+            ", ".join(str(slot.pick_rank) for slot in slate.locked),
+        )
     reads = PublicReads()
     try:
         plans = plan_slate(slate, settings=settings, ledger=ledger, reads=reads)

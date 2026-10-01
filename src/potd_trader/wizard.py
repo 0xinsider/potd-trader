@@ -16,7 +16,7 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 
-from .config import MAX_DAILY_PICKS
+from .config import DEFAULT_CAP_PICK_COUNT, MAX_DAILY_PICKS
 from .control import LiveControl
 from .storage import atomic_write, file_lock
 
@@ -97,11 +97,12 @@ def ask_stake(default: str = "5", step: str = "4/5") -> str:
 
 def ask_daily_cap(stake: str, default: str | None = None, step: str = "5/5") -> str:
     full_day = Decimal(stake) * MAX_DAILY_PICKS
+    suggested_cap = Decimal(stake) * DEFAULT_CAP_PICK_COUNT
     say(f"{step}  Daily principal limit.")
     say(f"     {MAX_DAILY_PICKS} picks at {stake} pUSD need {full_day} pUSD.")
     say("     Fees are additional. A lower cap skips picks once its budget is used.")
     while True:
-        value = _ask("     DAILY_CAP_USD", secret=False, default=default or str(full_day))
+        value = _ask("     DAILY_CAP_USD", secret=False, default=default or str(suggested_cap))
         try:
             cap = Decimal(value)
         except InvalidOperation:
