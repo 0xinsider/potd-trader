@@ -58,8 +58,8 @@ The person wants it running in minutes. The fastest path is theirs, not yours: `
 creates a fresh folder, asks 5 questions (keys with echo off), and needs a terminal, which you do not
 have. Offer it first:
 
-The v0.3.5 pin below is prepared but unpublished. Use it only after the coordinated release;
-published v0.3.4 retains the old 10-rank parser.
+The v0.3.5 pin below supports Pro and Max slates through 20 ranks. Older versions retain the
+10-rank parser and must be upgraded before reading the Max slate.
 
 ```bash
 git clone --branch v0.3.5 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
@@ -76,7 +76,7 @@ If they would rather you drive, do these in order and stop where it says stop.
    setup uses `Copy-Item .env.example .env` inside a folder restricted to the user and administrators.
 3. Tell them the 3 values to fill in, in one short message:
    - `OXINSIDER_API_KEY`: a live key (`oxi_sk_live_...`) from <https://0xinsider.com/developers>.
-     The pick endpoint needs Pro.
+     The pick endpoint needs Pro or Max.
    - `POLYMARKET_PRIVATE_KEY`: their signer key. Email or Google login: polymarket.com, Settings,
      Export private key (<https://help.polymarket.com/en/articles/13364258-how-do-i-export-my-key>).
      MetaMask or Rabby login: the key from that wallet app.

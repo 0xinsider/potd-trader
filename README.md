@@ -10,9 +10,8 @@ Your wallet key signs locally through the official Polymarket SDK.
 
 ## Install a version with locked dependencies
 
-This branch prepares **v0.3.5**, which is held and not published. The commands below are for its
-coordinated release and require that future tag. Published v0.3.4 accepts only ranks through 10;
-it does not support the Max 20-rank contract.
+**v0.3.5** supports Pro and Max slates with ranks through 20. Older versions accept only ranks
+through 10 and must be upgraded before reading the Max slate.
 
 Python 3.12.4+ and [uv](https://docs.astral.sh/uv/) are required. Supported systems: Windows
 with x64 Python, macOS and Linux, including WSL. Keep the configuration and ledger on a local
@@ -45,7 +44,7 @@ uv run --locked potd-trader init
 uv installs Python if needed. WSL is optional; native Windows uses the same commands and ledger
 format. Use x64 Python on Windows; native ARM64 Python is not covered by this release.
 
-Once v0.3.5 is published, use its [release page](https://github.com/0xinsider/potd-trader/releases)
+Use the [v0.3.5 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.5)
 to verify the source commit and package checksums. For an immutable source pin, check out that
 full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
