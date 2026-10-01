@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.6
+
+- Recognize Pro or Max from the authenticated feed response, never a local plan setting.
+  Pro allows five daily picks including the designated free selection; Max allows up to fifteen.
+  Missing or unknown included quotas stop trading. Historical wire ranks through twenty stay readable.
+- Atomically reserve each pick against the account's New York product-day allowance alongside
+  the existing UTC principal budget. Accepted and unresolved entries count; known rejections release
+  their slot. Existing ledger files remain readable.
+- Discard a cached slate when the authenticated allowance changes, including on a 304 response.
+  Report the current plan, reserved picks and the budget needed for that plan.
+- Preserve configured spending caps, price, authorization, kickoff, duplicate and live-stop guards.
+  Stop old watchers and preserve the shared ledger before upgrading.
+
 ## 0.3.5
 
 - Accept Pro and Max slates with ranks through 20. Pro opens 5 daily picks in total,

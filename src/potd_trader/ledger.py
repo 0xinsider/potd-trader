@@ -96,11 +96,27 @@ class Ledger:
         with file_lock(self.lock_path):
             return self._spent(self._read(), now or datetime.now(UTC))
 
+    @staticmethod
+    def _reserved_picks(entries: dict[str, dict[str, Any]], pick_date: str) -> int:
+        # The product day is New York; the independent principal budget stays UTC.
+        return len(
+            {
+                entry["pick_rank"]
+                for entry in entries.values()
+                if entry["state"] in BLOCKING_STATES and entry["pick_date"] == pick_date
+            }
+        )
+
+    def reserved_picks(self, pick_date: str) -> int:
+        with file_lock(self.lock_path):
+            return self._reserved_picks(self._read(), pick_date)
+
     def reserve(
         self,
         key: str,
         *,
         daily_cap: Decimal,
+        daily_pick_limit: int,
         stake_usd: Decimal,
         pick_date: str,
         pick_rank: int,
@@ -114,12 +130,16 @@ class Ledger:
             or daily_cap <= 0
             or not stake_usd.is_finite()
             or stake_usd <= 0
+            or isinstance(daily_pick_limit, bool)
+            or daily_pick_limit <= 0
         ):
-            raise LedgerError("live orders require a positive finite stake and DAILY_CAP_USD")
+            raise LedgerError("live orders require valid stake, principal cap and daily pick limit")
         with file_lock(self.lock_path):
             entries = self._read()
             if self._blocked(entries, key, pick_date, pick_rank, token_id):
                 return "pick, slot, or token already reserved in the ledger"
+            if self._reserved_picks(entries, pick_date) >= daily_pick_limit:
+                return f"account's {daily_pick_limit}-pick daily allowance is already reserved"
             instant = now or datetime.now(UTC)
             if self._spent(entries, instant) + stake_usd > daily_cap:
                 return "DAILY_CAP_USD would be exceeded by this reservation"
