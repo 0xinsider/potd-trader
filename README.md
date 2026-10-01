@@ -10,12 +10,15 @@ Your wallet key signs locally through the official Polymarket SDK.
 
 ## Install a version with locked dependencies
 
+**v0.3.5** supports Pro and Max slates with ranks through 20. Older versions accept only ranks
+through 10 and must be upgraded before reading the Max slate.
+
 Python 3.12.4+ and [uv](https://docs.astral.sh/uv/) are required. Supported systems: Windows
 with x64 Python, macOS and Linux, including WSL. Keep the configuration and ledger on a local
 filesystem, outside OneDrive, other synced folders and network drives.
 
 ```bash
-git clone --branch v0.3.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.5 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
@@ -32,7 +35,7 @@ In the new PowerShell window, use a local folder under your Windows profile:
 
 ```powershell
 Set-Location $env:USERPROFILE
-git clone --branch v0.3.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.5 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 Set-Location potd-trader-src
 uv sync --locked --python ">=3.12.4,<3.13"
 uv run --locked potd-trader init
@@ -41,9 +44,9 @@ uv run --locked potd-trader init
 uv installs Python if needed. WSL is optional; native Windows uses the same commands and ledger
 format. Use x64 Python on Windows; native ARM64 Python is not covered by this release.
 
-The [v0.3.4 release](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.4) identifies the
-merged commit and includes SHA-256 checksums for its package artifacts. For an immutable source
-pin, check out that full commit instead of a moving branch. `uv sync --locked` installs the
+Use the [v0.3.5 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.5)
+to verify the source commit and package checksums. For an immutable source pin, check out that
+full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
 an unversioned Git URL or a package without its lockfile does not reproduce that environment.
 
@@ -53,7 +56,10 @@ On macOS/Linux the folder is mode 700 and `.env` is mode 600. On Windows, the ne
 access to your user and administrators; files inherit its permissions. An inherited `LIVE=yes`
 cannot make this setup run buy. Only the final confirmation
 can enable subsequent live commands. An existing folder is never overwritten. The last two
-questions set your unit size per pick and daily cap; the cap prompt shows the cost of all 10.
+questions set your unit size per pick and daily cap; the cap prompt shows the cost of up to
+20 picks. Pro opens 5 daily picks in total, including the free pick; Max opens every available
+published pick up to 20. The existing init suggestion remains 10 stakes, and your chosen cap
+remains authoritative.
 
 From that new folder, `uv` finds the project in its parent directory:
 
@@ -68,7 +74,7 @@ uv run --locked potd-trader watch
 
 | Goes to | What | Why |
 | --- | --- | --- |
-| `api.0xinsider.com` | your 0xinsider API key | read today's Pro picks |
+| `api.0xinsider.com` | your 0xinsider API key | read today's entitled Pro or Max picks |
 | `clob.polymarket.com` | signed authentication messages, derived API credentials, signed orders, and token IDs | authenticate, check balance, quote, and buy |
 | `gamma-api.polymarket.com` | token IDs | read market identity, kickoff, tick size, and status |
 | `polymarket.com/api/geoblock` | your IP, as with any request | check trading eligibility for your location |
@@ -98,7 +104,7 @@ account and administrators. `chmod` does not set Windows access permissions.
 
 Fill in these values locally; never paste keys into a chat:
 
-- `OXINSIDER_API_KEY`: a live Pro key from [0xinsider.com/developers](https://0xinsider.com/developers).
+- `OXINSIDER_API_KEY`: a live Pro or Max key from [0xinsider.com/developers](https://0xinsider.com/developers).
 - `POLYMARKET_PRIVATE_KEY`: the signer key. Email/Google login: Polymarket Settings, Export
   private key ([official help](https://help.polymarket.com/en/articles/13364258-how-do-i-export-my-key)).
   Wallet login: export from that wallet app.
@@ -162,15 +168,24 @@ Live preflight also checks geoblocking, wallet approvals, and the available bala
 can fill partially; their full requested principal remains reserved for that UTC day. Exchange
 fees are additional: `STAKE_USD` and `DAILY_CAP_USD` bound order principal, not fee-inclusive debits.
 
+Identity-free `locked_picks` are access information, not trades. The CLI shows their ranks
+and a Max upgrade link. A successful `state: "none"` response has no released trade candidates,
+and replaces the previous slate; its missing game identity or schedule is never guessed.
+
 `watch` honors `Retry-After`, release times, and `proof_pending_picks[].retry_at`. Read transport
 failures receive bounded backoff with a visible warning; an ambiguous order does not get retried.
 
 Every released, otherwise eligible pick uses the same unit size. There is no rank-based selection,
 stake, or priority in this trader. If the remaining cap funds only some picks, the
 trader considers the earliest released eligible picks first, breaking simultaneous-release ties
-by token ID. It prints each cap skip. The default 25 pUSD cap funds five 5 pUSD picks, not all 10;
-set 50 pUSD explicitly if you want capacity for 10. `MIN_RANKS` and `MAX_RANKS` from older setups
-are ignored; `status`, `run`, and `watch` warn about them and about capacity below 10. The current
+by token ID. It prints each cap skip.
+
+The default 25 pUSD cap funds five 5 pUSD picks, up to the 5 daily picks Pro includes. Funding
+20 Max picks at that size would require 100 pUSD of principal, but a day may publish fewer picks.
+Existing default and configured caps are not raised automatically.
+
+`MIN_RANKS` and `MAX_RANKS` from older setups are ignored; `status`, `run`, and `watch` warn
+about them and about capacity below the possible 20-pick daily maximum. The current
 API still supplies a slot number for durable duplicate protection. Removing that contract across
 the product and historical proofs is tracked in
 [0xinsider/0xinsider#19968](https://github.com/0xinsider/0xinsider/issues/19968).
@@ -227,8 +242,8 @@ Build from the release checkout. Mount the configuration folder so `live off` on
 container see the same control file and ledger. Never bake secrets into the image.
 
 ```bash
-docker build -t potd-trader:0.3.4 .
-docker run --rm -v "$PWD/potd-trader:/app/data" potd-trader:0.3.4
+docker build -t potd-trader:0.3.5 .
+docker run --rm -v "$PWD/potd-trader:/app/data" potd-trader:0.3.5
 ```
 
 ## Verification and limits

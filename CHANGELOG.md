@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.3.5
+
+- Accept Pro and Max slates with ranks through 20. Pro opens 5 daily picks in total,
+  including the free pick; Max opens every available published pick up to 20.
+  A day can publish fewer picks.
+- Show identity-free locked-rank metadata with a Max upgrade link. Locked rows never become
+  trade candidates; a successful empty slate clears the watcher's previous slate.
+- Preserve configured spending caps, the 25 pUSD settings default, the init suggestion of 10
+  stakes, and all price, timing, authorization, duplicate, ledger and live-mode guards.
+- Use matching 0.3.5 project, runtime and lock metadata without changing dependencies.
+  Stop old watchers and preserve the shared ledger before upgrading.
+
 ## 0.3.4
 
 - Run natively on Windows with x64 Python 3.12.4+, uv and PowerShell. WSL is optional; Windows,

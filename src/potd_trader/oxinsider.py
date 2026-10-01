@@ -89,6 +89,15 @@ class ScheduledSlot(BaseModel):
     retry_at: AwareDatetime | None = None
 
 
+class LockedPickSlot(BaseModel):
+    """Access information only; a locked slot never becomes a trade candidate."""
+
+    model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
+
+    pick_rank: int = Field(ge=1, le=MAX_DAILY_PICKS)
+    required_tier: Literal["max"]
+
+
 @dataclass(frozen=True)
 class Slate:
     """A 200 response: the released picks plus any same-day slots still to come."""
@@ -98,6 +107,7 @@ class Slate:
     scheduled: tuple[ScheduledSlot, ...]
     etag: str | None
     proof_pending: tuple[ScheduledSlot, ...] = ()
+    locked: tuple[LockedPickSlot, ...] = ()
 
     @property
     def next_release_at(self) -> datetime | None:
@@ -188,12 +198,14 @@ def _parse_slate(payload: dict[str, Any], etag: str | None) -> Slate:
     pending = tuple(
         ScheduledSlot.model_validate(row) for row in data.get("proof_pending_picks", [])
     )
+    locked = tuple(LockedPickSlot.model_validate(row) for row in data.get("locked_picks") or [])
     return Slate(
         pick_date=data.get("pick_date"),
         picks=picks,
         scheduled=scheduled,
         etag=etag,
         proof_pending=pending,
+        locked=locked,
     )
 
 
@@ -252,6 +264,6 @@ class OxinsiderClient:
         if response.status_code in (402, 403):
             raise OxinsiderError(
                 f"0xinsider answered {response.status_code}: the Pick of the Day endpoint needs an "
-                "active Pro subscription on this key. https://0xinsider.com/pricing"
+                "active Pro or Max subscription on this key. https://0xinsider.com/pricing"
             )
         raise OxinsiderError(f"pick-of-the-day: unexpected HTTP {response.status_code}")

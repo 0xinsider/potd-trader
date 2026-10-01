@@ -21,10 +21,11 @@ from pathlib import Path
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# The most picks one product day carries; ranks run 1 to this. 0xinsider raised it from 6
-# to 10 on 2026-09-24, and a slate with rank 7 or higher failed validation whole, so no
-# pick traded on those days.
-MAX_DAILY_PICKS = 10
+# Public pick ranks can reach 20, including resolved ranks returned to Pro.
+# This is wire cardinality, not permission to spend beyond the local daily cap.
+MAX_DAILY_PICKS = 20
+# Keep the existing init suggestion when the API's pick cardinality changes.
+DEFAULT_CAP_PICK_COUNT = 10
 
 API_ORIGIN = "https://api.0xinsider.com"
 
@@ -61,7 +62,7 @@ class Settings(BaseSettings):
     )
 
     # 0xinsider (read-only: the pick).
-    oxinsider_api_key: SecretStr = Field(description="Pro API key, oxi_sk_live_...")
+    oxinsider_api_key: SecretStr = Field(description="Pro or Max API key, oxi_sk_live_...")
     oxinsider_api_base: str = "https://api.0xinsider.com"
 
     # Polymarket (the account that buys).
