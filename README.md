@@ -57,8 +57,9 @@ access to your user and administrators; files inherit its permissions. An inheri
 cannot make this setup run buy. Only the final confirmation
 can enable subsequent live commands. An existing folder is never overwritten. The last two
 questions set your unit size per pick and daily cap; the cap prompt shows the cost of up to
-20 picks. Pro opens unresolved ranks 1 through 5; Max opens every available published rank
-up to 20. The existing init suggestion remains 10 stakes, and your chosen cap remains authoritative.
+20 picks. Pro opens 5 daily picks in total, including the free pick; Max opens every available
+published pick up to 20. The existing init suggestion remains 10 stakes, and your chosen cap
+remains authoritative.
 
 From that new folder, `uv` finds the project in its parent directory:
 

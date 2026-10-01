@@ -2,8 +2,9 @@
 
 ## 0.3.5
 
-- Accept Pro and Max slates with ranks through 20. Pro opens unresolved ranks 1 through
-  5; Max opens every available published rank up to 20. A day can publish fewer picks.
+- Accept Pro and Max slates with ranks through 20. Pro opens 5 daily picks in total,
+  including the free pick; Max opens every available published pick up to 20.
+  A day can publish fewer picks.
 - Show identity-free locked-rank metadata with a Max upgrade link. Locked rows never become
   trade candidates; a successful empty slate clears the watcher's previous slate.
 - Preserve configured spending caps, the 25 pUSD settings default, the init suggestion of 10
