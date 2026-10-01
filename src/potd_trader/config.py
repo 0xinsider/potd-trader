@@ -21,9 +21,10 @@ from pathlib import Path
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# Public pick ranks can reach 20, including resolved ranks returned to Pro.
-# This is wire cardinality, not permission to spend beyond the local daily cap.
-MAX_DAILY_PICKS = 20
+# Current publication limit; historical wire ranks remain readable separately.
+PRO_DAILY_PICK_LIMIT = 5
+MAX_DAILY_PICKS = 15
+MAX_WIRE_PICK_RANK = 20
 # Keep the existing init suggestion when the API's pick cardinality changes.
 DEFAULT_CAP_PICK_COUNT = 10
 

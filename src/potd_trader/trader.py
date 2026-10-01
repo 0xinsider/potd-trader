@@ -14,7 +14,7 @@ from zoneinfo import ZoneInfo
 from .config import Settings
 from .control import LiveControl
 from .ledger import Ledger
-from .oxinsider import Pick, Slate
+from .oxinsider import Pick, PickAccess, Slate
 from .polymarket import Account, PublicReads, round_down_to_tick
 
 log = logging.getLogger("potd-trader")
@@ -23,6 +23,7 @@ log = logging.getLogger("potd-trader")
 @dataclass(frozen=True)
 class Plan:
     pick: Pick
+    access: PickAccess
     buy: bool
     reason: str
     # A transient skip (book too thin, price drifted) is worth another look before kickoff.
@@ -45,9 +46,11 @@ def plan_pick(
     reads: PublicReads,
     now: datetime,
     committed_today: Decimal,
+    committed_picks: int,
+    access: PickAccess,
 ) -> Plan:
     def skip(reason: str, *, transient: bool = False) -> Plan:
-        return Plan(pick=pick, buy=False, reason=reason, transient=transient)
+        return Plan(pick=pick, access=access, buy=False, reason=reason, transient=transient)
 
     if pick.pick_date != now.astimezone(ZoneInfo("America/New_York")).date().isoformat():
         return skip("pick is not from the current New York product day")
@@ -70,6 +73,8 @@ def plan_pick(
         pick.key, pick_date=pick.pick_date, pick_rank=pick.pick_rank, token_id=pick.token_id
     ):
         return skip("pick, slot, or token already reserved in the ledger")
+    if committed_picks >= access.daily_pick_limit:
+        return skip(f"{access.tier.title()} daily limit of {access.daily_pick_limit} picks reached")
 
     stake = settings.stake_usd
     if stake <= 0:
@@ -136,6 +141,7 @@ def plan_pick(
         )
     return Plan(
         pick=pick,
+        access=access,
         buy=True,
         reason=f"book {quote} <= MAX_PRICE {settings.max_price}",
         quote=quote,
@@ -157,10 +163,16 @@ def plan_slate(
         or any(pick.pick_date != slate.pick_date for pick in slate.picks)
     ):
         return [
-            Plan(pick=pick, buy=False, reason="duplicate or inconsistent slate identity")
+            Plan(
+                pick=pick,
+                access=slate.access,
+                buy=False,
+                reason="duplicate or inconsistent slate identity",
+            )
             for pick in slate.picks
         ]
     committed = ledger.spent_today_usd(now)
+    committed_picks = ledger.reserved_picks(slate.pick_date) if slate.pick_date else 0
     plans: list[Plan] = []
     # Spend scarce budget on the earliest released eligible picks. Rank is identity,
     # not a preference; token breaks simultaneous-release ties independently of rank.
@@ -175,9 +187,12 @@ def plan_slate(
             reads=reads,
             now=now,
             committed_today=committed,
+            committed_picks=committed_picks,
+            access=slate.access,
         )
         if plan.buy and plan.stake_usd is not None:
             committed += plan.stake_usd
+            committed_picks += 1
         plans.append(plan)
     return plans
 
@@ -202,6 +217,8 @@ def execute(
         reads=reads,
         now=datetime.now(UTC),
         committed_today=ledger.spent_today_usd(),
+        committed_picks=ledger.reserved_picks(plan.pick.pick_date),
+        access=plan.access,
     )
     if not plan.buy:
         log.info("SKIP %s | submission recheck: %s", plan.pick.label, plan.reason)
@@ -225,6 +242,7 @@ def execute(
         declined = ledger.reserve(
             pick.key,
             daily_cap=settings.daily_cap_usd,
+            daily_pick_limit=plan.access.daily_pick_limit,
             stake_usd=plan.stake_usd,
             pick_date=pick.pick_date,
             pick_rank=pick.pick_rank,

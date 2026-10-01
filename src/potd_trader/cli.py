@@ -20,7 +20,7 @@ from portalocker.exceptions import BaseLockException
 from pydantic import ValidationError
 
 from . import __version__
-from .config import MAX_DAILY_PICKS, Settings, active_env_file
+from .config import Settings, active_env_file
 from .control import LiveControl
 from .ledger import Ledger, LedgerError
 from .oxinsider import (
@@ -79,19 +79,12 @@ def _budget_banner(settings: Settings, spent: Decimal) -> None:
     remaining_picks = int(remaining // settings.stake_usd) if settings.stake_usd > 0 else 0
     log.info(
         "Unit size %s pUSD; daily cap %s pUSD covers %d pick(s), %d with current reservations "
-        "(up to %d may be published)",
+        "before the account's pick allowance",
         settings.stake_usd,
         settings.daily_cap_usd,
         settings.pick_capacity,
         remaining_picks,
-        MAX_DAILY_PICKS,
     )
-    if settings.pick_capacity < MAX_DAILY_PICKS:
-        log.warning(
-            "Daily cap cannot fund all %d picks at this unit size. Run `potd-trader size` "
-            "to choose a different limit.",
-            MAX_DAILY_PICKS,
-        )
     legacy = {"MIN_RANKS", "MAX_RANKS"}
     file_values = (
         dotenv_values(settings.control_env_path, interpolate=False)
@@ -198,6 +191,22 @@ def _handle_result(
         log.info("No change since the last read.")
         return [], None
     slate = result
+    reserved = ledger.reserved_picks(slate.pick_date) if slate.pick_date else 0
+    log.info(
+        "%s account: up to %d daily picks, %d already reserved for this product day. "
+        "Your spending cap still applies.",
+        slate.access.tier.title(),
+        slate.access.daily_pick_limit,
+        reserved,
+    )
+    if settings.pick_capacity < slate.access.daily_pick_limit:
+        log.warning(
+            "Your spending cap funds %d of up to %d %s picks. "
+            "Run `potd-trader size` to change your budget.",
+            settings.pick_capacity,
+            slate.access.daily_pick_limit,
+            slate.access.tier.title(),
+        )
     log.info(
         "Product day %s: %d released pick(s), %d scheduled",
         slate.pick_date,
@@ -206,9 +215,8 @@ def _handle_result(
     )
     if slate.locked:
         log.info(
-            "%d locked pick(s), ranks %s, require Max. Upgrade at https://0xinsider.com/pricing",
+            "%d additional pick(s) require Max. Upgrade at https://0xinsider.com/pricing",
             len(slate.locked),
-            ", ".join(str(slot.pick_rank) for slot in slate.locked),
         )
     reads = PublicReads()
     try:
@@ -288,6 +296,15 @@ def cmd_watch(settings: Settings) -> int:
             ledger = Ledger(settings.ledger_path)
             try:
                 result = client.pick_of_the_day(etag=etag)
+                if isinstance(result, NotModified):
+                    if last_slate is not None and result.access == last_slate.access:
+                        # The same authenticated allowance permits re-planning cached picks.
+                        result = last_slate
+                    else:
+                        # A downgrade must never reuse a previously entitled Max slate.
+                        etag, last_slate = None, None
+                        log.info("Account allowance changed or cache is empty; refreshing picks.")
+                        result = client.pick_of_the_day()
                 read_failures = 0
             except httpx.TransportError as exc:
                 read_failures += 1
@@ -299,9 +316,6 @@ def cmd_watch(settings: Settings) -> int:
                 )
                 time.sleep(delay)
                 continue
-            if isinstance(result, NotModified) and last_slate is not None:
-                # Same picks as before: re-plan them, because the book or the ledger may have moved.
-                result = last_slate
             plans, slate = _handle_result(result, settings, ledger)
             if slate is not None:
                 etag, last_slate = slate.etag, slate

@@ -10,15 +10,17 @@ Your wallet key signs locally through the official Polymarket SDK.
 
 ## Install a version with locked dependencies
 
-**v0.3.5** supports Pro and Max slates with ranks through 20. Older versions accept only ranks
-through 10 and must be upgraded before reading the Max slate.
+**v0.3.6** verifies your authenticated Pro or Max allowance before considering a buy. Pro
+includes five daily picks; Max includes every eligible published pick, up to fifteen. Earlier
+releases do not enforce this additional daily pick limit. Historical wire ranks through twenty
+remain readable.
 
 Python 3.12.4+ and [uv](https://docs.astral.sh/uv/) are required. Supported systems: Windows
 with x64 Python, macOS and Linux, including WSL. Keep the configuration and ledger on a local
 filesystem, outside OneDrive, other synced folders and network drives.
 
 ```bash
-git clone --branch v0.3.5 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.6 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
@@ -35,7 +37,7 @@ In the new PowerShell window, use a local folder under your Windows profile:
 
 ```powershell
 Set-Location $env:USERPROFILE
-git clone --branch v0.3.5 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.3.6 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 Set-Location potd-trader-src
 uv sync --locked --python ">=3.12.4,<3.13"
 uv run --locked potd-trader init
@@ -44,7 +46,7 @@ uv run --locked potd-trader init
 uv installs Python if needed. WSL is optional; native Windows uses the same commands and ledger
 format. Use x64 Python on Windows; native ARM64 Python is not covered by this release.
 
-Use the [v0.3.5 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.5)
+Use the [v0.3.6 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.6)
 to verify the source commit and package checksums. For an immutable source pin, check out that
 full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
@@ -57,8 +59,8 @@ access to your user and administrators; files inherit its permissions. An inheri
 cannot make this setup run buy. Only the final confirmation
 can enable subsequent live commands. An existing folder is never overwritten. The last two
 questions set your unit size per pick and daily cap; the cap prompt shows the cost of up to
-20 picks. Pro opens 5 daily picks in total, including the free pick; Max opens every available
-published pick up to 20. The existing init suggestion remains 10 stakes, and your chosen cap
+15 picks. Pro opens 5 daily picks in total, including the free pick; Max opens every available
+published pick up to 15. The existing init suggestion remains 10 stakes, and your chosen cap
 remains authoritative.
 
 From that new folder, `uv` finds the project in its parent directory:
@@ -150,7 +152,7 @@ other settings. A local `.env` is used alone; the home file is a fallback, not m
 
 ## What happens before an order
 
-1. Validate current New York product dates and unique pick slots/tokens. Refuse a duplicate or
+1. Verify the same response's authenticated account allowance, then validate current New York product dates and unique pick slots/tokens. Refuse a duplicate or
    inconsistent slate. Skip settled, unreleased, started, out-of-rank, or incomplete picks.
 2. Require a positive published price and a current entry authorization for the selected token.
 3. Check the independent Polymarket market identity and backed outcome, an explicitly open
@@ -159,8 +161,9 @@ other settings. A local `.env` is used alone; the home file is a fallback, not m
    `max_entry_price` together. The authorization is a drift limit, not a promise of profit.
 5. Recheck the market and book before signing. After signing, recheck live control and the
    quote deadline (30 seconds at most, shorter near kickoff/authorization expiry).
-6. Under an exclusive file lock, reload the ledger, reject a repeated pick/slot/token, and reserve
-   the stake against the local UTC submission day. Persist and sync the reservation before posting.
+6. Under an exclusive file lock, reload the ledger, reject a repeated pick/slot/token, enforce
+   the account's New York daily pick limit, and reserve the stake against the local UTC
+   submission day. Persist and sync the reservation before posting.
 7. Post one Fill-and-Kill BUY through the SDK's separate `post_order`. Record its result without
    automatic approval transactions or an application retry of an ambiguous submission.
 
@@ -168,8 +171,8 @@ Live preflight also checks geoblocking, wallet approvals, and the available bala
 can fill partially; their full requested principal remains reserved for that UTC day. Exchange
 fees are additional: `STAKE_USD` and `DAILY_CAP_USD` bound order principal, not fee-inclusive debits.
 
-Identity-free `locked_picks` are access information, not trades. The CLI shows their ranks
-and a Max upgrade link. A successful `state: "none"` response has no released trade candidates,
+Identity-free `locked_picks` are access information, not trades. The CLI shows how many
+additional picks require Max and an upgrade link. A successful `state: "none"` response has no released trade candidates,
 and replaces the previous slate; its missing game identity or schedule is never guessed.
 
 `watch` honors `Retry-After`, release times, and `proof_pending_picks[].retry_at`. Read transport
@@ -181,14 +184,35 @@ trader considers the earliest released eligible picks first, breaking simultaneo
 by token ID. It prints each cap skip.
 
 The default 25 pUSD cap funds five 5 pUSD picks, up to the 5 daily picks Pro includes. Funding
-20 Max picks at that size would require 100 pUSD of principal, but a day may publish fewer picks.
+15 Max picks at that size would require 75 pUSD of principal, but a day may publish fewer picks.
 Existing default and configured caps are not raised automatically.
 
 `MIN_RANKS` and `MAX_RANKS` from older setups are ignored; `status`, `run`, and `watch` warn
-about them and about capacity below the possible 20-pick daily maximum. The current
+about them. The feed read reports your Pro or Max allowance and warns only when your chosen spending
+cap cannot cover that plan's possible daily picks. The current
 API still supplies a slot number for durable duplicate protection. Removing that contract across
 the product and historical proofs is tracked in
 [0xinsider/0xinsider#19968](https://github.com/0xinsider/0xinsider/issues/19968).
+
+## Pro and Max access
+
+Your API key determines access; there is no local tier setting. The trader recognizes the
+verified feed response's `X-Monthly-Quota-Limit` header: the current included allowance of
+500,000 requests identifies Pro, and 2,000,000 identifies Max. This is not the optional
+pay-as-you-go ceiling. Missing or unrecognized allowances stop trading instead of guessing a
+plan. A future quota or pick-limit change requires a compatible trader release.
+
+Pro can reserve at most five distinct picks per New York product day, including the designated
+free pick. It is not a rank filter: the free selection may have a later presentation slot.
+Max can reserve up to fifteen. The server's filtered feed still decides which selections your
+account may see; locked selections are never enriched or bought. Existing accepted, submitting
+and unknown reservations count toward the daily allowance, including entries from an earlier
+release. Confirmed rejections release their pick reservation.
+
+A watcher checks the account allowance on every successful response, including `304`. If it
+changes, the old slate is discarded and a fresh authenticated read is required. A lapsed key
+cannot keep trading from a cached slate. Stop older watchers before upgrading; separate local
+folders or machines do not share these limits.
 
 ## Ledger and recovery
 
@@ -242,8 +266,8 @@ Build from the release checkout. Mount the configuration folder so `live off` on
 container see the same control file and ledger. Never bake secrets into the image.
 
 ```bash
-docker build -t potd-trader:0.3.5 .
-docker run --rm -v "$PWD/potd-trader:/app/data" potd-trader:0.3.5
+docker build -t potd-trader:0.3.6 .
+docker run --rm -v "$PWD/potd-trader:/app/data" potd-trader:0.3.6
 ```
 
 ## Verification and limits

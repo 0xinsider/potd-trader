@@ -18,9 +18,36 @@ import httpx
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from . import __version__
-from .config import MAX_DAILY_PICKS, validate_api_origin
+from .config import (
+    MAX_DAILY_PICKS,
+    MAX_WIRE_PICK_RANK,
+    PRO_DAILY_PICK_LIMIT,
+    validate_api_origin,
+)
 
 PICK_PATH = "/api/v1/pick-of-the-day"
+
+
+@dataclass(frozen=True)
+class PickAccess:
+    """Account authority from the authenticated feed response, never local settings."""
+
+    tier: Literal["pro", "max"]
+    daily_pick_limit: int
+
+
+def _pick_access(headers: httpx.Headers) -> PickAccess:
+    # The published included monthly quota is account-owned, not the optional
+    # pay-as-you-go ceiling. Unknown future allowances require a reviewed reader.
+    allowance = headers.get("X-Monthly-Quota-Limit")
+    if allowance == "500000":
+        return PickAccess(tier="pro", daily_pick_limit=PRO_DAILY_PICK_LIMIT)
+    if allowance == "2000000":
+        return PickAccess(tier="max", daily_pick_limit=MAX_DAILY_PICKS)
+    raise OxinsiderError(
+        "pick-of-the-day: missing or unrecognized authenticated account allowance; "
+        "no orders permitted. Check https://0xinsider.com/developers or update potd-trader."
+    )
 
 
 class EntryAuthorization(BaseModel):
@@ -44,7 +71,7 @@ class Pick(BaseModel):
     model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
 
     pick_date: str = Field(pattern=r"^\d{4}-\d{2}-\d{2}$")
-    pick_rank: int = Field(default=1, ge=1, le=MAX_DAILY_PICKS)
+    pick_rank: int = Field(default=1, ge=1, le=MAX_WIRE_PICK_RANK)
     outcome: str
     matchup: str | None = None
     pick_outcome_label: str | None = None
@@ -83,7 +110,7 @@ class Pick(BaseModel):
 class ScheduledSlot(BaseModel):
     model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
 
-    pick_rank: int = Field(ge=1, le=MAX_DAILY_PICKS)
+    pick_rank: int = Field(ge=1, le=MAX_WIRE_PICK_RANK)
     release_at: AwareDatetime
     kickoff: AwareDatetime | None = None
     retry_at: AwareDatetime | None = None
@@ -94,7 +121,7 @@ class LockedPickSlot(BaseModel):
 
     model_config = ConfigDict(extra="ignore", allow_inf_nan=False)
 
-    pick_rank: int = Field(ge=1, le=MAX_DAILY_PICKS)
+    pick_rank: int = Field(ge=1, le=MAX_WIRE_PICK_RANK)
     required_tier: Literal["max"]
 
 
@@ -106,6 +133,7 @@ class Slate:
     picks: tuple[Pick, ...]
     scheduled: tuple[ScheduledSlot, ...]
     etag: str | None
+    access: PickAccess
     proof_pending: tuple[ScheduledSlot, ...] = ()
     locked: tuple[LockedPickSlot, ...] = ()
 
@@ -126,6 +154,8 @@ class NotReleased:
 @dataclass(frozen=True)
 class NotModified:
     """A 304: nothing changed since the ETag we sent."""
+
+    access: PickAccess
 
 
 @dataclass(frozen=True)
@@ -175,7 +205,7 @@ def _json_or_none(response: httpx.Response) -> dict[str, Any] | None:
     return body if isinstance(body, dict) else None
 
 
-def _parse_slate(payload: dict[str, Any], etag: str | None) -> Slate:
+def _parse_slate(payload: dict[str, Any], etag: str | None, access: PickAccess) -> Slate:
     data = payload.get("data", payload)
     if not isinstance(data, dict):
         raise OxinsiderError("pick-of-the-day: response body is not an object")
@@ -193,6 +223,11 @@ def _parse_slate(payload: dict[str, Any], etag: str | None) -> Slate:
         raise OxinsiderError("pick-of-the-day: duplicate slot or token; refusing the whole slate")
     if any(pick.pick_date != data.get("pick_date") for pick in picks):
         raise OxinsiderError("pick-of-the-day: inconsistent product dates")
+    if sum(pick.outcome == "pending" for pick in picks) > access.daily_pick_limit:
+        raise OxinsiderError(
+            "pick-of-the-day: unresolved picks exceed the authenticated daily allowance; "
+            "refusing the whole slate"
+        )
     scheduled_rows = data.get("scheduled_picks") or []
     scheduled = tuple(ScheduledSlot.model_validate(row) for row in scheduled_rows)
     pending = tuple(
@@ -204,14 +239,15 @@ def _parse_slate(payload: dict[str, Any], etag: str | None) -> Slate:
         picks=picks,
         scheduled=scheduled,
         etag=etag,
+        access=access,
         proof_pending=pending,
         locked=locked,
     )
 
 
-def parse_slate(payload: dict[str, Any], etag: str | None) -> Slate:
+def parse_slate(payload: dict[str, Any], etag: str | None, access: PickAccess) -> Slate:
     try:
-        return _parse_slate(payload, etag)
+        return _parse_slate(payload, etag, access)
     except (ValidationError, ValueError, TypeError) as exc:
         raise OxinsiderError(
             "pick-of-the-day: malformed safety fields; refusing the slate"
@@ -245,9 +281,9 @@ class OxinsiderClient:
         if response.status_code == 200:
             if body is None:
                 raise OxinsiderError("pick-of-the-day: 200 without a JSON body")
-            return parse_slate(body, response.headers.get("ETag"))
+            return parse_slate(body, response.headers.get("ETag"), _pick_access(response.headers))
         if response.status_code == 304:
-            return NotModified()
+            return NotModified(access=_pick_access(response.headers))
         if response.status_code == 404 and reason == "pick_not_released":
             return NotReleased(retry_at=_retry_instant(response.headers, body))
         if response.status_code in (429, 503):
