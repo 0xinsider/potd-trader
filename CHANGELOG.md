@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Document the API's policy-8 five-cent entry allowance and preserved policy-7 two-cent grants.
+  The API rollout changes new authorizations; trader code, version, and local settings are unchanged.
+- Explain the three independent quote guards, signed Fill-and-Kill order limit, partial fills,
+  and average fill price from confirmed spend and shares. Five cents is an absolute allowance;
+  the default `MAX_SLIPPAGE_PCT=3` remains a separate percentage guard.
+
 ## 0.3.6
 
 - Recognize Pro or Max from the authenticated feed response, never a local plan setting.
