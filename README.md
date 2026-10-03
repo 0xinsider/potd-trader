@@ -194,6 +194,42 @@ API still supplies a slot number for durable duplicate protection. Removing that
 the product and historical proofs is tracked in
 [0xinsider/0xinsider#19968](https://github.com/0xinsider/0xinsider/issues/19968).
 
+## Price protection and fill price
+
+The trader checks the current book for your full `STAKE_USD` before submitting a buy. The
+quote is the highest price level that stake would reach, not just the best ask or an average
+fill price. It must pass all three independent guards:
+
+| Guard | Maximum permitted quote |
+| --- | --- |
+| API `entry_authorization.max_entry_price` | The ceiling returned for that exact token and authorization |
+| `MAX_PRICE` | Your configured absolute ceiling; default `0.925` (92.5 cents per share) |
+| `MAX_SLIPPAGE_PCT` | Published `backed_price` multiplied by `1 + MAX_SLIPPAGE_PCT / 100`; default 3% |
+
+The API allowance is versioned. New policy-8 authorizations allow **5 cents** above the first
+reference ask, capped at 85 cents and rounded down to the provider's tick. Policy-7 authorizations
+keep their original 2-cent allowance and frozen price/expiry. The reference ask can predate the
+pick's release. Always read the returned `max_entry_price`; the trader does not reconstruct it.
+The five-cent allowance does not mean 5%, and does not change your `.env` settings.
+
+For example, a 64-cent reference ask gives a policy-8 ceiling of 69 cents with a 1-cent tick.
+If the published pick price is 66.5 cents, the default 3% guard allows a quote up to 68.495 cents.
+A 68-cent quote passes both guards; a 69-cent quote still fails the 3% guard.
+
+```text
+stake-sized book quote -> all three guards -> signed order limit -> confirmed fills
+```
+
+After a fresh quote passes, the trader rounds that quote down to the market tick and signs it
+as the order's maximum buy price. The order limit can therefore be lower than the API ceiling.
+Polymarket's Fill-and-Kill order may fill partially or not at all if the book moves; it cannot
+buy above the signed limit. See the [official order contract](https://docs.polymarket.com/trading/place-orders).
+
+Price guards use the quote **before** submission. Your actual average fill price comes **after**
+execution: confirmed pUSD spent divided by confirmed shares received. The ledger records those
+amounts; an accepted order alone does not prove a fill. This average excludes additional fees.
+The pick's published `backed_price` is its reference price, not your personal fill price.
+
 ## Pro and Max access
 
 Your API key determines access; there is no local tier setting. The trader recognizes the
@@ -252,8 +288,8 @@ active `.env` control file containing `LIVE=yes`; keys may still come from the e
 | --- | --- | --- |
 | `LIVE` | `no` | exact `yes` in process settings and active `.env`, with no `HALT` |
 | `STAKE_USD` | `5` | order principal per pick; `0` means no buys |
-| `MAX_PRICE` | `0.925` | maximum purchase probability |
-| `MAX_SLIPPAGE_PCT` | `3` | maximum increase over the published backed price |
+| `MAX_PRICE` | `0.925` | absolute ceiling on the stake-sized book quote, in pUSD per share |
+| `MAX_SLIPPAGE_PCT` | `3` | maximum percentage increase of the quote over the published backed price; `3` means 3%, not 3 cents |
 | `DAILY_CAP_USD` | `25` | positive ceiling on UTC order principal plus unresolved prior intents |
 | `KICKOFF_BUFFER_MINUTES` | `5` | stop buying this far before kickoff or authorization expiry |
 | `LEDGER_PATH` | `ledger.json` beside `.env` | shared durable order state |
