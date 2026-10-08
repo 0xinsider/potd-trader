@@ -1,6 +1,21 @@
 # Changelog
 
-## Unreleased
+## 0.4.0
+
+- Add `potd-trader kalshi` setup, market discovery, explicit contract review, dry-run, IOC buying,
+  watch, stop, ledger and read-only provider reconciliation commands. Default to isolated demo and
+  stopped mode. Existing Polymarket commands keep their contracts.
+- Require reviewed source token/condition and destination ticker/outcome mappings. Pin both
+  providers' rules, source kickoff and linked Kalshi contract PDF bytes; changed or uncertain
+  contracts skip. Signals remain Polymarket-derived; Kalshi expected returns are not inferred.
+- Bound whole-contract sizing with conservative fee reserves and local caps. Preserve source
+  authorization/slippage plus destination caps, atomic duplicate reservations and HALT barriers.
+  Ambiguous/zero-fill acknowledgements remain reserved until complete terminal readback.
+- Support locally signed RSA/Ed25519 credentials, official V2 YES-book bid/ask conversion,
+  provider tick grids, exchange shard status/balance and isolated account/environment binding.
+- Verify permitted source lint, formatting, typing, compilation, public API reads, stopped CLI
+  commands and packaging. No automated tests or real orders were run for this release.
+
 
 - Document the API's policy-8 five-cent entry allowance and preserved policy-7 two-cent grants.
   The API rollout changes new authorizations; trader code, version, and local settings are unchanged.

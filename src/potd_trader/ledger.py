@@ -166,6 +166,24 @@ class Ledger:
             entries[key].update(state=state, updated_at=datetime.now(UTC).isoformat())
             self._flush(entries)
 
+    def reconcile(self, key: str, state: str, *, client_order_id: str, **fields: Any) -> None:
+        """Resolve only a matching unresolved local intent after complete provider evidence."""
+        if state not in {"accepted", "rejected"}:
+            raise LedgerError("invalid reconciled state")
+        with file_lock(self.lock_path):
+            entries = self._read()
+            entry = entries.get(key)
+            if (
+                entry is None
+                or entry["state"] not in {"submitting", "unknown"}
+                or entry.get("provider") != "kalshi"
+                or entry.get("client_order_id") != client_order_id
+            ):
+                raise LedgerError("reconciliation has no matching unresolved Kalshi intent")
+            entry.update(fields)
+            entry.update(state=state, updated_at=datetime.now(UTC).isoformat())
+            self._flush(entries)
+
     def entries(self) -> list[tuple[str, dict[str, Any]]]:
         with file_lock(self.lock_path):
             return sorted(self._read().items(), key=lambda item: item[1]["created_at"])

@@ -10,7 +10,8 @@ Your wallet key signs locally through the official Polymarket SDK.
 
 ## Install a version with locked dependencies
 
-**v0.3.6** verifies your authenticated Pro or Max allowance before considering a buy. Pro
+**v0.4.0** adds separate Kalshi commands using reviewed equivalent contracts. The existing
+Polymarket commands retain their behavior. It also verifies your authenticated Pro or Max allowance before considering a buy. Pro
 includes five daily picks; Max includes every eligible published pick, up to fifteen. Earlier
 releases do not enforce this additional daily pick limit. Historical wire ranks through twenty
 remain readable.
@@ -20,7 +21,7 @@ with x64 Python, macOS and Linux, including WSL. Keep the configuration and ledg
 filesystem, outside OneDrive, other synced folders and network drives.
 
 ```bash
-git clone --branch v0.3.6 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.0 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
@@ -37,7 +38,7 @@ In the new PowerShell window, use a local folder under your Windows profile:
 
 ```powershell
 Set-Location $env:USERPROFILE
-git clone --branch v0.3.6 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.0 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 Set-Location potd-trader-src
 uv sync --locked --python ">=3.12.4,<3.13"
 uv run --locked potd-trader init
@@ -46,7 +47,7 @@ uv run --locked potd-trader init
 uv installs Python if needed. WSL is optional; native Windows uses the same commands and ledger
 format. Use x64 Python on Windows; native ARM64 Python is not covered by this release.
 
-Use the [v0.3.6 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.3.6)
+Use the [v0.4.0 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.4.0)
 to verify the source commit and package checksums. For an immutable source pin, check out that
 full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
@@ -71,6 +72,79 @@ uv run --locked potd-trader run --dry-run
 uv run --locked potd-trader live on     # type "spend real money" yourself
 uv run --locked potd-trader watch
 ```
+
+## Buy reviewed contracts on Kalshi
+
+Use the separate [Kalshi guide](https://docs.0xinsider.com/guides/auto-buy-the-pick-on-kalshi).
+The signal still comes from Polymarket wallet analytics. Kalshi has its own account, contracts,
+settlement rules, prices and fees. No Polymarket expected return is represented as a Kalshi return.
+
+```bash
+uv run --locked potd-trader kalshi init
+cd kalshi-potd-demo
+```
+
+Fill in `.env.kalshi` privately: your Pro or Max `OXINSIDER_API_KEY`, demo
+`KALSHI_API_KEY_ID`, and `KALSHI_PRIVATE_KEY_PATH` pointing at your local RSA (at least 2,048 bits)
+or Ed25519 PEM. Keep the key file private (`chmod 600 kalshi-key.pem` on macOS/Linux).
+Get a separate demo account and API key at [demo.kalshi.co](https://demo.kalshi.co).
+The private signing key stays local. Do not paste any key in a chat.
+
+```bash
+uv run --locked potd-trader kalshi status
+uv run --locked potd-trader kalshi picks
+uv run --locked potd-trader kalshi markets --series KXNFLGAME
+uv run --locked potd-trader kalshi map --rank <slot> --ticker <ticker> --outcome yes --max-price <price>
+uv run --locked potd-trader kalshi run --dry-run
+```
+
+`map` shows the source outcome/rules and Kalshi rules/linked contract terms. Review game versus
+map, overtime, tie, postponement, cancellation and settlement behavior. Type `the same event,
+outcome and settlement rules` only if they agree. Every unmapped, changed, unavailable, expired
+or ambiguous contract skips. This release does not infer mappings from team names. Source
+kickoff owns the cutoff; a Kalshi close time is not treated as kickoff. Reviewed identity/rules,
+linked contract PDF hashes and the source kickoff are checked again before submitting.
+
+Only binary $1 default-settlement contracts are supported. Demo fixtures without real event
+settlement and combinations are refused. Demo markets can differ from production, and a matching
+current POTD may not exist in demo. An empty book or no equivalent demo contract is an honest skip.
+
+Kalshi `STAKE_USD` and `DAILY_CAP_USD` include principal plus a **conservative exchange fee
+reservation**, not an estimated fee. Each contract reserves `0.0175 * maximum_fee_multiplier
++ 1.0001` dollars for fees, covering worst-case fractional fill rounding without assuming rebates.
+This can buy substantially fewer contracts than principal-only sizing. The ledger retains this
+full reserve for accepted and unresolved orders, and displays confirmed exchange debit separately.
+Unknown fee models skip. External broker/FCM commissions are unsupported. Each order also obeys
+its reviewed price cap, `MAX_PRICE`, the source authorization ceiling and `MAX_SLIPPAGE_PCT`.
+
+```bash
+uv run --locked potd-trader kalshi live on  # user types "place demo orders"
+uv run --locked potd-trader kalshi watch
+uv run --locked potd-trader kalshi live off
+uv run --locked potd-trader kalshi reconcile
+uv run --locked potd-trader kalshi ledger
+```
+
+Only you enable orders. `run --dry-run` and `watch --dry-run` force no submission even with
+`LIVE=yes`. Kalshi buys integer quantities with Immediate-or-Cancel: no new resting order is
+intended. A zero-fill acknowledgement remains reserved until terminal provider readback confirms
+it; ambiguous transport/results never cause an automatic repost. The user must not hand-edit the ledger.
+
+For real funds, create a **new** folder with `kalshi init kalshi-potd-live --environment production`.
+Use production credentials and new mappings there. Its enabling phrase is `spend real money on
+Kalshi`. Use a dedicated Kalshi account with default subaccount 0 and no concurrent manual trades or
+other trading tools. Position/resting-order reads are delayed projections and cannot atomically
+prevent another app racing a submission. Eligibility is your account's responsibility. Configuration is read only from the current
+folder's `.env.kalshi`; process environment values and the Polymarket `.env` are ignored. The
+ledger is bound to that environment/key ID and paths. All instances for the same Kalshi account
+must share one local configuration/ledger folder. Separate copies or machines do not coordinate.
+
+Kalshi runtime destinations are `api.0xinsider.com` (only the feed key),
+`gamma-api.polymarket.com` (source token identity/rules through the existing SDK),
+`external-api.demo.kalshi.co` or `external-api.kalshi.com` (market/account reads and signed orders),
+and `assets.kalshi.com` (bounded official contract PDFs). Redirects and custom API destinations
+are refused. The PEM never leaves your machine. The table below describes the existing
+Polymarket commands.
 
 ## What leaves your machine
 

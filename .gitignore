@@ -18,3 +18,11 @@ dist/
 build/
 .mypy_cache/
 .ruff_cache/
+
+# Kalshi local control, reviewed mappings and account binding.
+.local-dev/
+.env.kalshi
+kalshi-ledger.json*
+kalshi-mappings.json*
+.kalshi-*
+*.pem
