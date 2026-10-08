@@ -10,7 +10,7 @@ Your wallet key signs locally through the official Polymarket SDK.
 
 ## Install a version with locked dependencies
 
-**v0.4.0** adds separate Kalshi commands using reviewed equivalent contracts. The existing
+**v0.4.1** adds one-command interactive Kalshi setup using reviewed equivalent contracts. The existing
 Polymarket commands retain their behavior. It also verifies your authenticated Pro or Max allowance before considering a buy. Pro
 includes five daily picks; Max includes every eligible published pick, up to fifteen. Earlier
 releases do not enforce this additional daily pick limit. Historical wire ranks through twenty
@@ -21,7 +21,7 @@ with x64 Python, macOS and Linux, including WSL. Keep the configuration and ledg
 filesystem, outside OneDrive, other synced folders and network drives.
 
 ```bash
-git clone --branch v0.4.0 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.1 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
@@ -38,7 +38,7 @@ In the new PowerShell window, use a local folder under your Windows profile:
 
 ```powershell
 Set-Location $env:USERPROFILE
-git clone --branch v0.4.0 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.1 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 Set-Location potd-trader-src
 uv sync --locked --python ">=3.12.4,<3.13"
 uv run --locked potd-trader init
@@ -47,7 +47,7 @@ uv run --locked potd-trader init
 uv installs Python if needed. WSL is optional; native Windows uses the same commands and ledger
 format. Use x64 Python on Windows; native ARM64 Python is not covered by this release.
 
-Use the [v0.4.0 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.4.0)
+Use the [v0.4.1 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.4.1)
 to verify the source commit and package checksums. For an immutable source pin, check out that
 full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
@@ -79,23 +79,39 @@ Use the separate [Kalshi guide](https://docs.0xinsider.com/guides/auto-buy-the-p
 The signal still comes from Polymarket wallet analytics. Kalshi has its own account, contracts,
 settlement rules, prices and fees. No Polymarket expected return is represented as a Kalshi return.
 
+On macOS or Linux, paste this one command into your terminal:
+
 ```bash
-uv run --locked potd-trader kalshi init
-cd kalshi-potd-demo
+curl -fsSL https://raw.githubusercontent.com/0xinsider/potd-trader/v0.4.1/scripts/setup-kalshi.sh | sh
 ```
 
-Fill in `.env.kalshi` privately: your Pro or Max `OXINSIDER_API_KEY`, demo
-`KALSHI_API_KEY_ID`, and `KALSHI_PRIVATE_KEY_PATH` pointing at your local RSA (at least 2,048 bits)
-or Ed25519 PEM. Keep the key file private (`chmod 600 kalshi-key.pem` on macOS/Linux).
+It installs an isolated Python and trader, then asks for what it needs: a configuration folder,
+demo or production, account credentials, your local signing-key file, and spending limits.
+Keys stay hidden as you type. The wizard checks your account, shows available picks, asks you
+to review a matching Kalshi contract, and runs a dry run. It then offers to start watching
+in that terminal with your explicit enabling phrase. Ctrl-C ends that session and stops trading.
+
 Get a separate demo account and API key at [demo.kalshi.co](https://demo.kalshi.co).
-The private signing key stays local. Do not paste any key in a chat.
+Download the matching RSA (at least 2,048 bits) or Ed25519 PEM before setup. The wizard asks
+for its path and copies it into the private configuration folder. Your 0xinsider key needs Pro
+or Max. Do not paste keys into a chat. An interrupted setup can be resumed with the same command;
+stop an existing watcher first. Existing ledgers and reviewed mappings are retained.
+
+The installer pins uv 0.12.23, Python 3.12.15, and trader 0.4.1. It checks the uv installer hash
+and release asset checksums, then installs the locked dependency versions with required hashes.
+It creates a separate runtime under `~/.local/share/potd-trader/kalshi/` without changing shell
+profiles or system Python. Installation downloads come from GitHub, Astral, and PyPI; those
+hosts receive no trading credentials. Runtime destinations are listed below.
+
+If you already installed from source, use `uv run --locked potd-trader kalshi setup` instead.
+Native Windows uses this source command; the shell installer supports macOS and Linux.
+The wizard creates a `trader` launcher in your configuration folder. From that folder:
 
 ```bash
-uv run --locked potd-trader kalshi status
-uv run --locked potd-trader kalshi picks
-uv run --locked potd-trader kalshi markets --series KXNFLGAME
-uv run --locked potd-trader kalshi map --rank <slot> --ticker <ticker> --outcome yes --max-price <price>
-uv run --locked potd-trader kalshi run --dry-run
+./trader setup
+./trader status
+./trader run --dry-run
+./trader live off
 ```
 
 `map` shows the source outcome/rules and Kalshi rules/linked contract terms. Review game versus
@@ -118,11 +134,11 @@ Unknown fee models skip. External broker/FCM commissions are unsupported. Each o
 its reviewed price cap, `MAX_PRICE`, the source authorization ceiling and `MAX_SLIPPAGE_PCT`.
 
 ```bash
-uv run --locked potd-trader kalshi live on  # user types "place demo orders"
-uv run --locked potd-trader kalshi watch
-uv run --locked potd-trader kalshi live off
-uv run --locked potd-trader kalshi reconcile
-uv run --locked potd-trader kalshi ledger
+./trader live on  # user types "place demo orders"
+./trader watch
+./trader live off
+./trader reconcile
+./trader ledger
 ```
 
 Only you enable orders. `run --dry-run` and `watch --dry-run` force no submission even with
@@ -130,7 +146,7 @@ Only you enable orders. `run --dry-run` and `watch --dry-run` force no submissio
 intended. A zero-fill acknowledgement remains reserved until terminal provider readback confirms
 it; ambiguous transport/results never cause an automatic repost. The user must not hand-edit the ledger.
 
-For real funds, create a **new** folder with `kalshi init kalshi-potd-live --environment production`.
+For real funds, rerun setup and choose a **new** production configuration folder.
 Use production credentials and new mappings there. Its enabling phrase is `spend real money on
 Kalshi`. Use a dedicated Kalshi account with default subaccount 0 and no concurrent manual trades or
 other trading tools. Position/resting-order reads are delayed projections and cannot atomically

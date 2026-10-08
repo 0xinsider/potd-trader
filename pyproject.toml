@@ -1,6 +1,6 @@
 [project]
 name = "potd-trader"
-version = "0.4.0"
+version = "0.4.1"
 description = "Buy the 0xinsider Pick of the Day on your own Polymarket account. Your keys stay on your machine. Kalshi uses reviewed mappings."
 readme = "README.md"
 license = "MIT"

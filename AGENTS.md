@@ -30,7 +30,9 @@ recalling a signature.
 `potd-trader kalshi` is additive user-authorized execution of Polymarket-derived signals.
 `kalshi.py` owns official REST/auth/order reads and writes; `kalshi_mapping.py` owns reviewed
 provider snapshots; `kalshi_config.py` owns local-file-only account/environment binding;
-`kalshi_trader.py` owns all trade guards; `kalshi_cli.py` owns isolated setup and commands.
+`kalshi_trader.py` owns all trade guards; `kalshi_cli.py` owns commands and `kalshi_setup.py`
+owns the resumable terminal wizard. `scripts/setup-kalshi.sh` is the pinned macOS/Linux
+distribution installer: GitHub, Astral, and PyPI reads carry no user credentials.
 Read [the Kalshi guide](https://docs.0xinsider.com/guides/auto-buy-the-pick-on-kalshi) and the
 adapter's pinned official contract pointers before changing a provider call. `.env.kalshi`,
 PEM keys, mappings, binding and the ledger are local private state. Never enable orders for the
