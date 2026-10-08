@@ -242,9 +242,9 @@ def execute(
                 plan.max_price,
                 client_order_id,
                 before_post=lambda: (
-                    control.enabled(settings.is_live)
+                    KalshiSettings.load().model_dump() == settings.model_dump()
+                    and control.enabled(settings.is_live)
                     and datetime.now(UTC) < deadline
-                    and KalshiSettings.load().model_dump() == settings.model_dump()
                 ),
             )
         except KalshiNotSubmitted as exc:
