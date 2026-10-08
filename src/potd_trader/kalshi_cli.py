@@ -21,6 +21,7 @@ from .control import LiveControl
 from .kalshi import KalshiClient, KalshiError
 from .kalshi_config import KalshiConfigError, KalshiSettings
 from .kalshi_mapping import Mapping, MappingError, MappingStore, source_facts
+from .kalshi_setup import setup
 from .kalshi_trader import execute, plan_pick
 from .ledger import Ledger, LedgerError
 from .oxinsider import NotModified, NotReleased, OxinsiderClient, OxinsiderError, Slate, TryLater
@@ -71,7 +72,7 @@ def _slate(settings: KalshiSettings) -> Slate | None:
     return result
 
 
-def cmd_init(directory: Path, environment: str) -> int:
+def cmd_init(directory: Path, environment: str, *, guided: bool = False) -> int:
     folder = prepare_folder(directory)
     # No inherited LIVE or API key is copied. The user enters credentials in the
     # private local file; the command is usable without a terminal or any key.
@@ -93,9 +94,10 @@ def cmd_init(directory: Path, environment: str) -> int:
     atomic_write(folder / "HALT", "Kalshi setup starts stopped\n")
     atomic_write(folder / ".gitignore", ".env*\n*.pem\n*.json*\n.*lock\nHALT\n.kalshi-*\n")
     log.info("Created stopped %s configuration: %s", environment, folder / ".env.kalshi")
-    log.info("Save your matching Kalshi account's PEM key to %s", folder / "kalshi-key.pem")
-    log.info("Fill KALSHI_API_KEY_ID and OXINSIDER_API_KEY privately, then cd %s", folder)
-    log.info("Run potd-trader kalshi status, then picks, markets, map and run --dry-run.")
+    if not guided:
+        log.info("Save your matching Kalshi account's PEM key to %s", folder / "kalshi-key.pem")
+        log.info("Fill KALSHI_API_KEY_ID and OXINSIDER_API_KEY privately, then cd %s", folder)
+        log.info("Run potd-trader kalshi status, then picks, markets, map and run --dry-run.")
     return 0
 
 
@@ -309,6 +311,23 @@ def cmd_run(settings: KalshiSettings) -> int:
     return 0
 
 
+def cmd_watch(settings: KalshiSettings) -> int:
+    log.info(
+        "Kalshi watcher starts with %s configuration; Ctrl-C stops this process",
+        settings.environment,
+    )
+    while True:
+        try:
+            result = cmd_run(settings)
+        except FeedWait as exc:
+            log.warning("%s; watcher honors the provider retry time", exc)
+            time.sleep(exc.delay)
+            continue
+        if result:
+            return result
+        time.sleep(60)
+
+
 def cmd_live(settings: KalshiSettings, state: str) -> int:
     control = LiveControl(settings.control_env_path)
     if state == "off":
@@ -450,6 +469,8 @@ def main(argv: list[str] | None = None) -> int:
     init = sub.add_parser("init", help="create a stopped, isolated Kalshi configuration")
     init.add_argument("directory", nargs="?", type=Path)
     init.add_argument("--environment", choices=["demo", "production"], default="demo")
+    wizard = sub.add_parser("setup", help="interactive account, contract review and dry-run setup")
+    wizard.add_argument("directory", nargs="?", type=Path)
     for name in ("status", "picks", "ledger", "reconcile"):
         sub.add_parser(name)
     markets = sub.add_parser("markets", help="list the first page of open candidate markets")
@@ -479,6 +500,8 @@ def main(argv: list[str] | None = None) -> int:
                 "kalshi-potd-demo" if args.environment == "demo" else "kalshi-potd-live"
             )
             return cmd_init(directory, args.environment)
+        if args.command == "setup":
+            return setup(args.directory)
         settings = KalshiSettings.load()
         if getattr(args, "dry_run", False):
             settings = settings.model_copy(update={"live": "no"})
@@ -489,20 +512,7 @@ def main(argv: list[str] | None = None) -> int:
         if args.command == "live":
             return cmd_live(settings, args.state)
         if args.command == "watch":
-            log.info(
-                "Kalshi watcher starts with %s configuration; Ctrl-C stops this process",
-                settings.environment,
-            )
-            while True:
-                try:
-                    result = cmd_run(settings)
-                except FeedWait as exc:
-                    log.warning("%s; watcher honors the provider retry time", exc)
-                    time.sleep(exc.delay)
-                    continue
-                if result:
-                    return result
-                time.sleep(60)
+            return cmd_watch(settings)
         commands = {
             "status": cmd_status,
             "picks": cmd_picks,
@@ -514,6 +524,9 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         log.info("Stopped. Interrupted submissions remain reserved until provider reconciliation.")
         return 130
+    except EOFError:
+        log.error("Terminal input ended. Rerun Kalshi setup in your terminal to continue.")
+        return 1
     except ValidationError as exc:
         names = ", ".join(".".join(str(p) for p in err["loc"]) for err in exc.errors())
         log.error("Invalid configuration or provider fields: %s; no new order permitted", names)
