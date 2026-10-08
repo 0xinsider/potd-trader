@@ -515,9 +515,14 @@ def cmd_ledger(settings: Settings) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "kalshi":
+        from .kalshi_cli import main as kalshi_main
+
+        return kalshi_main(arguments[1:])
     parser = argparse.ArgumentParser(
         prog="potd-trader",
-        description="Buy the 0xinsider Pick of the Day on your own Polymarket account.",
+        description="Buy POTD on Polymarket, or reviewed contracts with kalshi commands.",
     )
     parser.add_argument("--version", action="version", version=f"potd-trader {__version__}")
     parser.add_argument("-v", "--verbose", action="store_true", help="debug logging")
@@ -532,6 +537,7 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="the new folder to create (default: ./potd-trader); it must not exist yet",
     )
+    sub.add_parser("kalshi", help="review and buy equivalent POTD contracts on Kalshi")
     sub.add_parser("status", help="check region, account, approvals, balance and the ledger")
     sub.add_parser(
         "size", help="interactively set per-pick unit size and daily cap while live is off"

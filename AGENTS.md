@@ -25,6 +25,21 @@ Contracts to read before changing a call: the endpoint,
 Read the installed package with `uv run python -c "import inspect, polymarket; ..."` rather than
 recalling a signature.
 
+## Kalshi execution
+
+`potd-trader kalshi` is additive user-authorized execution of Polymarket-derived signals.
+`kalshi.py` owns official REST/auth/order reads and writes; `kalshi_mapping.py` owns reviewed
+provider snapshots; `kalshi_config.py` owns local-file-only account/environment binding;
+`kalshi_trader.py` owns all trade guards; `kalshi_cli.py` owns isolated setup and commands.
+Read [the Kalshi guide](https://docs.0xinsider.com/guides/auto-buy-the-pick-on-kalshi) and the
+adapter's pinned official contract pointers before changing a provider call. `.env.kalshi`,
+PEM keys, mappings, binding and the ledger are local private state. Never enable orders for the
+user. Kalshi destinations are the adapter's fixed demo/production origins and bounded official
+`assets.kalshi.com` contract PDFs; the existing source SDK reads stay read-only. These additions
+are explicitly authorized by Trevor's October 8, 2026 delivery request; rule 6 still prohibits
+any further destinations. Root repository/user no-tests instructions take precedence over the
+legacy helper and rule 8: use permitted source/platform/package/runtime checks, never run tests.
+
 ## Rules that never bend
 
 1. Never print, echo, log, cat, or paste `.env`, `POLYMARKET_PRIVATE_KEY`, `OXINSIDER_API_KEY`,
@@ -58,11 +73,11 @@ The person wants it running in minutes. The fastest path is theirs, not yours: `
 creates a fresh folder, asks 5 questions (keys with echo off), and needs a terminal, which you do not
 have. Offer it first:
 
-The v0.3.6 pin below verifies authenticated Pro (five) or Max (fifteen) daily picks.
+The v0.4.0 pin below verifies authenticated Pro (five) or Max (fifteen) daily picks.
 Historical wire ranks through twenty remain readable. Stop older watchers before upgrading.
 
 ```bash
-git clone --branch v0.3.6 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.0 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init

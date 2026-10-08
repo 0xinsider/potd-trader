@@ -1,7 +1,7 @@
 [project]
 name = "potd-trader"
-version = "0.3.6"
-description = "Buy the 0xinsider Pick of the Day on your own Polymarket account. Your keys stay on your machine."
+version = "0.4.0"
+description = "Buy the 0xinsider Pick of the Day on your own Polymarket account. Your keys stay on your machine. Kalshi uses reviewed mappings."
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.12.4"
@@ -11,6 +11,7 @@ dependencies = [
     # Official Polymarket SDK: signs orders locally, talks to the CLOB.
     "polymarket-client==0.10.0",
     "httpx>=0.27,<1",
+    "cryptography==50.0.2",
     "pydantic>=2,<3",
     "pydantic-settings>=2,<3",
     "python-dotenv>=1.2,<2",

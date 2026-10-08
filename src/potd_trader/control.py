@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -33,11 +33,13 @@ class LiveControl:
         with file_lock(self.lock_path):
             yield self.enabled(started_live)
 
-    def set_live(self, live: bool) -> None:
+    def set_live(self, live: bool, *, before_enable: Callable[[], bool] | None = None) -> None:
         if not live:
             # Signal before waiting so another watcher cannot begin while off awaits the lock.
             atomic_write(self.halt_path, "Stopped by potd-trader live off\n")
         with file_lock(self.lock_path):
+            if live and before_enable is not None and not before_enable():
+                raise ValueError("configuration changed before enabling orders")
             lines = self.env_path.read_text(encoding="utf-8").splitlines()
             kept = [line for line in lines if not _live_assignment(line)]
             kept.append(f"LIVE={'yes' if live else 'no'}")
