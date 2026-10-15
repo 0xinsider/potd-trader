@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.4.2
+
+- Accept up to twenty daily Max picks and wire ranks through twenty-five, including
+  replacement ranks after withdrawals. Pro remains limited to five daily picks.
+- Update installation pins and allowance copy. Existing price, stake, spending, kickoff,
+  account and stop settings remain unchanged. Stop older watchers before upgrading.
+- Verify source lint, formatting, typing, CLI metadata and packaging without tests or orders.
+
 ## 0.4.0
 
 - Add `potd-trader kalshi` setup, market discovery, explicit contract review, dry-run, IOC buying,
