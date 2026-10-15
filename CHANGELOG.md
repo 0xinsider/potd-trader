@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.3
+
+- Clarify returned API entry limits and expiry alongside the trader's local price safeguards.
+- Correct the current twenty-pick budget example and update installation pins.
+- Refresh packaged guidance. Trading behavior and existing user settings are unchanged.
+
 ## 0.4.2
 
 - Accept up to twenty daily Max picks and wire ranks through twenty-five, including
@@ -25,11 +31,10 @@
   commands and packaging. No automated tests or real orders were run for this release.
 
 
-- Document the API's policy-8 five-cent entry allowance and preserved policy-7 two-cent grants.
-  The API rollout changes new authorizations; trader code, version, and local settings are unchanged.
+- Document returned API entry permissions. Trader code, version and local settings are unchanged.
 - Explain the three independent quote guards, signed Fill-and-Kill order limit, partial fills,
-  and average fill price from confirmed spend and shares. Five cents is an absolute allowance;
-  the default `MAX_SLIPPAGE_PCT=3` remains a separate percentage guard.
+  and average fill price from confirmed spend and shares. The local slippage limit remains
+  a separate percentage guard.
 
 ## 0.3.6
 

@@ -10,7 +10,7 @@ Your wallet key signs locally through the official Polymarket SDK.
 
 ## Install a version with locked dependencies
 
-**v0.4.2** supports up to twenty daily Max picks and replacement ranks through twenty-five.
+**v0.4.3** supports up to twenty daily Max picks and replacement ranks through twenty-five.
 Pro includes five daily picks. The trader verifies your authenticated allowance before
 considering a buy, and your configured spending limits remain authoritative. Stop older
 watchers before upgrading. One-command interactive Kalshi setup remains available for
@@ -21,7 +21,7 @@ with x64 Python, macOS and Linux, including WSL. Keep the configuration and ledg
 filesystem, outside OneDrive, other synced folders and network drives.
 
 ```bash
-git clone --branch v0.4.2 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.3 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
@@ -38,7 +38,7 @@ In the new PowerShell window, use a local folder under your Windows profile:
 
 ```powershell
 Set-Location $env:USERPROFILE
-git clone --branch v0.4.2 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.3 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 Set-Location potd-trader-src
 uv sync --locked --python ">=3.12.4,<3.13"
 uv run --locked potd-trader init
@@ -47,7 +47,7 @@ uv run --locked potd-trader init
 uv installs Python if needed. WSL is optional; native Windows uses the same commands and ledger
 format. Use x64 Python on Windows; native ARM64 Python is not covered by this release.
 
-Use the [v0.4.2 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.4.2)
+Use the [v0.4.3 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.4.3)
 to verify the source commit and package checksums. For an immutable source pin, check out that
 full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
@@ -82,7 +82,7 @@ settlement rules, prices and fees. No Polymarket expected return is represented 
 On macOS or Linux, paste this one command into your terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0xinsider/potd-trader/v0.4.2/scripts/setup-kalshi.sh | sh
+curl -fsSL https://raw.githubusercontent.com/0xinsider/potd-trader/v0.4.3/scripts/setup-kalshi.sh | sh
 ```
 
 It installs an isolated Python and trader, then asks for what it needs: a configuration folder,
@@ -97,7 +97,7 @@ for its path and copies it into the private configuration folder. Your 0xinsider
 or Max. Do not paste keys into a chat. An interrupted setup can be resumed with the same command;
 stop an existing watcher first. Existing ledgers and reviewed mappings are retained.
 
-The installer pins uv 0.12.23, Python 3.12.15, and trader 0.4.2. It checks the uv installer hash
+The installer pins uv 0.12.23, Python 3.12.15, and trader 0.4.3. It checks the uv installer hash
 and release asset checksums, then installs the locked dependency versions with required hashes.
 It creates a separate runtime under `~/.local/share/potd-trader/kalshi/` without changing shell
 profiles or system Python. Installation downloads come from GitHub, Astral, and PyPI; those
@@ -274,7 +274,7 @@ trader considers the earliest released eligible picks first, breaking simultaneo
 by token ID. It prints each cap skip.
 
 The default 25 pUSD cap funds five 5 pUSD picks, up to the 5 daily picks Pro includes. Funding
-15 Max picks at that size would require 75 pUSD of principal, but a day may publish fewer picks.
+20 Max picks at that size would require 100 pUSD of principal, but a day may publish fewer picks.
 Existing default and configured caps are not raised automatically.
 
 `MIN_RANKS` and `MAX_RANKS` from older setups are ignored; `status`, `run`, and `watch` warn
@@ -296,15 +296,10 @@ fill price. It must pass all three independent guards:
 | `MAX_PRICE` | Your configured absolute ceiling; default `0.925` (92.5 cents per share) |
 | `MAX_SLIPPAGE_PCT` | Published `backed_price` multiplied by `1 + MAX_SLIPPAGE_PCT / 100`; default 3% |
 
-The API allowance is versioned. New policy-8 authorizations allow **5 cents** above the first
-reference ask, capped at 85 cents and rounded down to the provider's tick. Policy-7 authorizations
-keep their original 2-cent allowance and frozen price/expiry. The reference ask can predate the
-pick's release. Always read the returned `max_entry_price`; the trader does not reconstruct it.
-The five-cent allowance does not mean 5%, and does not change your `.env` settings.
-
-For example, a 64-cent reference ask gives a policy-8 ceiling of 69 cents with a 1-cent tick.
-If the published pick price is 66.5 cents, the default 3% guard allows a quote up to 68.495 cents.
-A 68-cent quote passes both guards; a 69-cent quote still fails the 3% guard.
+Honor the returned `entry_authorization.max_entry_price` and `expires_at` for the named token.
+The trader uses those returned values directly. Your local `MAX_PRICE` and `MAX_SLIPPAGE_PCT`
+remain separate limits, and a quote must satisfy all three. The API permission does not raise
+your configured limits or extend an expired authorization.
 
 ```text
 stake-sized book quote -> all three guards -> signed order limit -> confirmed fills
