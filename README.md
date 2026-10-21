@@ -10,18 +10,19 @@ Your wallet key signs locally through the official Polymarket SDK.
 
 ## Install a version with locked dependencies
 
-**v0.4.3** supports up to twenty daily Max picks and replacement ranks through twenty-five.
-Pro includes five daily picks. The trader verifies your authenticated allowance before
-considering a buy, and your configured spending limits remain authoritative. Stop older
-watchers before upgrading. One-command interactive Kalshi setup remains available for
-reviewed equivalent contracts.
+**v0.4.4** makes `watch` check for new picks every minute by default, so a pick published
+during the day is found within a minute instead of up to 30. It supports up to twenty daily
+Max picks and replacement ranks through twenty-five. Pro includes five daily picks. The trader
+verifies your authenticated allowance before considering a buy, and your configured spending
+limits remain authoritative. Stop older watchers before upgrading. One-command interactive
+Kalshi setup remains available for reviewed equivalent contracts.
 
 Python 3.12.4+ and [uv](https://docs.astral.sh/uv/) are required. Supported systems: Windows
 with x64 Python, macOS and Linux, including WSL. Keep the configuration and ledger on a local
 filesystem, outside OneDrive, other synced folders and network drives.
 
 ```bash
-git clone --branch v0.4.3 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
@@ -38,7 +39,7 @@ In the new PowerShell window, use a local folder under your Windows profile:
 
 ```powershell
 Set-Location $env:USERPROFILE
-git clone --branch v0.4.3 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 Set-Location potd-trader-src
 uv sync --locked --python ">=3.12.4,<3.13"
 uv run --locked potd-trader init
@@ -47,7 +48,7 @@ uv run --locked potd-trader init
 uv installs Python if needed. WSL is optional; native Windows uses the same commands and ledger
 format. Use x64 Python on Windows; native ARM64 Python is not covered by this release.
 
-Use the [v0.4.3 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.4.3)
+Use the [v0.4.4 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.4.4)
 to verify the source commit and package checksums. For an immutable source pin, check out that
 full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
@@ -82,7 +83,7 @@ settlement rules, prices and fees. No Polymarket expected return is represented 
 On macOS or Linux, paste this one command into your terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0xinsider/potd-trader/v0.4.3/scripts/setup-kalshi.sh | sh
+curl -fsSL https://raw.githubusercontent.com/0xinsider/potd-trader/v0.4.4/scripts/setup-kalshi.sh | sh
 ```
 
 It installs an isolated Python and trader, then asks for what it needs: a configuration folder,
@@ -97,7 +98,7 @@ for its path and copies it into the private configuration folder. Your 0xinsider
 or Max. Do not paste keys into a chat. An interrupted setup can be resumed with the same command;
 stop an existing watcher first. Existing ledgers and reviewed mappings are retained.
 
-The installer pins uv 0.12.23, Python 3.12.15, and trader 0.4.3. It checks the uv installer hash
+The installer pins uv 0.12.23, Python 3.12.15, and trader 0.4.4. It checks the uv installer hash
 and release asset checksums, then installs the locked dependency versions with required hashes.
 It creates a separate runtime under `~/.local/share/potd-trader/kalshi/` without changing shell
 profiles or system Python. Installation downloads come from GitHub, Astral, and PyPI; those
@@ -265,6 +266,20 @@ Identity-free `locked_picks` are access information, not trades. The CLI shows h
 additional picks require Max and an upgrade link. A successful `state: "none"` response has no released trade candidates,
 and replaces the previous slate; its missing game identity or schedule is never guessed.
 
+Picks found during the day publish immediately and are not announced in advance, so they never
+appear in `scheduled_picks`. `watch` therefore rechecks every `WATCH_IDLE_MINUTES` minutes
+(default 1). Each recheck is a conditional request that sends the last `ETag` and gets `304 Not
+Modified` when nothing changed; it still costs one request against your API allowance. At 1
+minute that is about 43,200 requests a month: 2.2% of Max's 2,000,000 or 8.6% of Pro's 500,000.
+Raise `WATCH_IDLE_MINUTES` to save quota; a new pick can then wait up to that many minutes
+before the watcher sees it. A scheduled release is read at its release time whatever the setting. While a released
+pick skips for a reason that can change, such as a thin book or a price above your limits, each
+recheck also reads its Polymarket market and book again.
+
+`watch` prints the value it uses when it starts. A setup copied from an older `.env.example`
+keeps its `WATCH_IDLE_MINUTES=30` line after an upgrade: change it to `1` or delete the line,
+then restart the watcher. Setups created by `init` do not write the line and use the default.
+
 `watch` honors `Retry-After`, release times, and `proof_pending_picks[].retry_at`. Read transport
 failures receive bounded backoff with a visible warning; an ambiguous order does not get retried.
 
@@ -379,7 +394,7 @@ active `.env` control file containing `LIVE=yes`; keys may still come from the e
 | `KICKOFF_BUFFER_MINUTES` | `5` | stop buying this far before kickoff or authorization expiry |
 | `LEDGER_PATH` | `ledger.json` beside `.env` | shared durable order state |
 | `POTD_TRADER_HOME` | `~/.potd-trader` | fallback configuration folder |
-| `WATCH_IDLE_MINUTES` | `30` | idle recheck cadence |
+| `WATCH_IDLE_MINUTES` | `1` | minutes between `watch` rechecks for picks that publish without notice; each costs one API request, so raise it to save quota |
 
 ## Docker
 
