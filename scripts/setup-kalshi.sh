@@ -1,13 +1,13 @@
 #!/bin/sh
 # Run from a terminal:
-# curl -fsSL https://raw.githubusercontent.com/0xinsider/potd-trader/v0.4.3/scripts/setup-kalshi.sh | sh
+# curl -fsSL https://raw.githubusercontent.com/0xinsider/potd-trader/v0.4.4/scripts/setup-kalshi.sh | sh
 # Keep the body in a function: a truncated download cannot start the installation.
 
 main() {
     set -eu
     umask 077
 
-    version=0.4.3
+    version=0.4.4
     uv_version=0.12.23
     python_version=3.12.15
     uv_installer_sha=b8e6c43099ee9f9a550984d3ad56948457c689e7a99c090b35377234ac241491

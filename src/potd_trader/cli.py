@@ -284,7 +284,13 @@ def cmd_watch(settings: Settings) -> int:
     )
     _mode_banner(settings)
     _budget_banner(settings, Ledger(settings.ledger_path).spent_today_usd())
-    log.info("Watching. Ctrl-C stops it. Nothing is polled faster than the server asks for.")
+    # Picks found during the day publish immediately and are never scheduled in advance,
+    # so the idle recheck is how the watcher finds them. A 304 read costs one request.
+    log.info(
+        "Watching. Ctrl-C stops it. Checks for new picks every %d minute(s) "
+        "(WATCH_IDLE_MINUTES) and follows the server's release and retry times.",
+        settings.watch_idle_minutes,
+    )
     client = OxinsiderClient(
         settings.oxinsider_api_base, settings.oxinsider_api_key.get_secret_value()
     )

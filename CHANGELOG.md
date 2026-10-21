@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.4.4
+
+- `watch` now checks for new picks every minute by default (`WATCH_IDLE_MINUTES=1`, was 30).
+  Picks found during the day publish immediately without notice, so the old default could see
+  one up to 30 minutes late. Each check is one API request, about 43,200 a month; raise the
+  setting to save quota. `watch` prints the value it uses when it starts.
+- A `.env` copied from an older `.env.example` keeps `WATCH_IDLE_MINUTES=30`: change it to `1` or
+  delete the line, then restart the watcher. Setups made by `init` use the new default.
+- Scheduled releases, server retry times, price, budget, kickoff and stop settings are unchanged.
+  Stop older watchers before upgrading.
+
 ## 0.4.3
 
 - Clarify returned API entry limits and expiry alongside the trader's local price safeguards.

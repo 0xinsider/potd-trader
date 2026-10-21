@@ -85,7 +85,7 @@ class Settings(BaseSettings):
 
     # Files and cadence.
     ledger_path: Path = Field(default_factory=default_ledger_path)
-    watch_idle_minutes: int = Field(default=30, ge=1, le=1440)
+    watch_idle_minutes: int = Field(default=1, ge=1, le=1440)
     control_env_path: Path = Field(default_factory=lambda: active_env_file().resolve())
 
     @classmethod

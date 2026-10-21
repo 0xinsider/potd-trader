@@ -75,11 +75,11 @@ The person wants it running in minutes. The fastest path is theirs, not yours: `
 creates a fresh folder, asks 5 questions (keys with echo off), and needs a terminal, which you do not
 have. Offer it first:
 
-The v0.4.3 pin below verifies authenticated Pro (five) or Max (twenty) daily picks.
+The v0.4.4 pin below verifies authenticated Pro (five) or Max (twenty) daily picks.
 Wire ranks through twenty-five accommodate withdrawn commitments. Stop older watchers before upgrading.
 
 ```bash
-git clone --branch v0.4.3 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
