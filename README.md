@@ -10,9 +10,9 @@ Your wallet key signs locally through the official Polymarket SDK.
 
 ## Install a version with locked dependencies
 
-**v0.4.4** makes `watch` check for new picks every minute by default, so a pick published
-during the day is found within a minute instead of up to 30. It supports up to twenty daily
-Max picks and replacement ranks through twenty-five. Pro includes five daily picks. The trader
+**v0.4.5** supports up to twenty-five daily Max picks and replacement ranks through thirty.
+`watch` checks for new picks every minute by default, so a pick published during the day is
+found within a minute. Pro includes five daily picks. The trader
 verifies your authenticated allowance before considering a buy, and your configured spending
 limits remain authoritative. Stop older watchers before upgrading. One-command interactive
 Kalshi setup remains available for reviewed equivalent contracts.
@@ -22,7 +22,7 @@ with x64 Python, macOS and Linux, including WSL. Keep the configuration and ledg
 filesystem, outside OneDrive, other synced folders and network drives.
 
 ```bash
-git clone --branch v0.4.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.5 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 cd potd-trader-src
 uv sync --locked
 uv run --locked potd-trader init
@@ -39,7 +39,7 @@ In the new PowerShell window, use a local folder under your Windows profile:
 
 ```powershell
 Set-Location $env:USERPROFILE
-git clone --branch v0.4.4 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
+git clone --branch v0.4.5 --depth 1 https://github.com/0xinsider/potd-trader potd-trader-src
 Set-Location potd-trader-src
 uv sync --locked --python ">=3.12.4,<3.13"
 uv run --locked potd-trader init
@@ -48,7 +48,7 @@ uv run --locked potd-trader init
 uv installs Python if needed. WSL is optional; native Windows uses the same commands and ledger
 format. Use x64 Python on Windows; native ARM64 Python is not covered by this release.
 
-Use the [v0.4.4 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.4.4)
+Use the [v0.4.5 release page](https://github.com/0xinsider/potd-trader/releases/tag/v0.4.5)
 to verify the source commit and package checksums. For an immutable source pin, check out that
 full commit instead of a moving branch. `uv sync --locked` installs the
 versions and artifact hashes in the checked-in `uv.lock` and refuses a stale lockfile. Installing
@@ -61,8 +61,8 @@ access to your user and administrators; files inherit its permissions. An inheri
 cannot make this setup run buy. Only the final confirmation
 can enable subsequent live commands. An existing folder is never overwritten. The last two
 questions set your unit size per pick and daily cap; the cap prompt shows the cost of up to
-20 picks. Pro opens 5 daily picks in total, including the free pick; Max opens every available
-published pick up to 20. The existing init suggestion remains 10 stakes, and your chosen cap
+25 picks. Pro opens 5 daily picks in total, including the free pick; Max opens every available
+published pick up to 25. The existing init suggestion remains 10 stakes, and your chosen cap
 remains authoritative.
 
 From that new folder, `uv` finds the project in its parent directory:
@@ -83,7 +83,7 @@ settlement rules, prices and fees. No Polymarket expected return is represented 
 On macOS or Linux, paste this one command into your terminal:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/0xinsider/potd-trader/v0.4.4/scripts/setup-kalshi.sh | sh
+curl -fsSL https://raw.githubusercontent.com/0xinsider/potd-trader/v0.4.5/scripts/setup-kalshi.sh | sh
 ```
 
 It installs an isolated Python and trader, then asks for what it needs: a configuration folder,
@@ -98,7 +98,7 @@ for its path and copies it into the private configuration folder. Your 0xinsider
 or Max. Do not paste keys into a chat. An interrupted setup can be resumed with the same command;
 stop an existing watcher first. Existing ledgers and reviewed mappings are retained.
 
-The installer pins uv 0.12.23, Python 3.12.15, and trader 0.4.4. It checks the uv installer hash
+The installer pins uv 0.12.23, Python 3.12.15, and trader 0.4.5. It checks the uv installer hash
 and release asset checksums, then installs the locked dependency versions with required hashes.
 It creates a separate runtime under `~/.local/share/potd-trader/kalshi/` without changing shell
 profiles or system Python. Installation downloads come from GitHub, Astral, and PyPI; those
@@ -289,7 +289,7 @@ trader considers the earliest released eligible picks first, breaking simultaneo
 by token ID. It prints each cap skip.
 
 The default 25 pUSD cap funds five 5 pUSD picks, up to the 5 daily picks Pro includes. Funding
-20 Max picks at that size would require 100 pUSD of principal, but a day may publish fewer picks.
+25 Max picks at that size would require 125 pUSD of principal, but a day may publish fewer picks.
 Existing default and configured caps are not raised automatically.
 
 `MIN_RANKS` and `MAX_RANKS` from older setups are ignored; `status`, `run`, and `watch` warn
@@ -340,7 +340,7 @@ plan. A future quota or pick-limit change requires a compatible trader release.
 
 Pro can reserve at most five distinct picks per New York product day, including the designated
 free pick. It is not a rank filter: the free selection may have a later presentation slot.
-Max can reserve up to twenty. The server's filtered feed still decides which selections your
+Max can reserve up to twenty-five. The server's filtered feed still decides which selections your
 account may see; locked selections are never enriched or bought. Existing accepted, submitting
 and unknown reservations count toward the daily allowance, including entries from an earlier
 release. Confirmed rejections release their pick reservation.
