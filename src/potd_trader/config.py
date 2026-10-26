@@ -23,8 +23,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Current publication limit; historical wire ranks remain readable separately.
 PRO_DAILY_PICK_LIMIT = 5
-MAX_DAILY_PICKS = 20
-MAX_WIRE_PICK_RANK = 25
+MAX_DAILY_PICKS = 25
+MAX_WIRE_PICK_RANK = 30
 # Keep the existing init suggestion when the API's pick cardinality changes.
 DEFAULT_CAP_PICK_COUNT = 10
 

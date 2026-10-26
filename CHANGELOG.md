@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.5
+
+- Accept up to twenty-five daily Max picks and wire ranks through thirty, including
+  replacement ranks after withdrawals (0xinsider raised its daily ceiling from 20 to 25 on
+  2026-10-26). Pro remains limited to five daily picks.
+- Older releases refuse a slate that carries a rank above 25 and stop buying at 20 Max picks.
+  Stop older watchers before upgrading.
+- Price, stake, spending, kickoff, account, watch interval and stop settings are unchanged; the
+  init cap prompt now shows the cost of 25 picks.
+
 ## 0.4.4
 
 - `watch` now checks for new picks every minute by default (`WATCH_IDLE_MINUTES=1`, was 30).
