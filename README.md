@@ -151,7 +151,7 @@ For real funds, rerun setup and choose a **new** production configuration folder
 Use production credentials and new mappings there. Its enabling phrase is `spend real money on
 Kalshi`. Use a dedicated Kalshi account with default subaccount 0 and no concurrent manual trades or
 other trading tools. Position/resting-order reads are delayed projections and cannot atomically
-prevent another app racing a submission. Eligibility is your account's responsibility. Configuration is read only from the current
+prevent another app racing a submission. Eligibility is your account's responsibility. Configuration comes only from the current
 folder's `.env.kalshi`; process environment values and the Polymarket `.env` are ignored. The
 ledger is bound to that environment/key ID and paths. All instances for the same Kalshi account
 must share one local configuration/ledger folder. Separate copies or machines do not coordinate.

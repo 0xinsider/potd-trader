@@ -62,7 +62,7 @@ class Settings(BaseSettings):
         env_file_encoding="utf-8", extra="ignore", allow_inf_nan=False
     )
 
-    # 0xinsider (read-only: the pick).
+    # 0xinsider (only fetches the pick).
     oxinsider_api_key: SecretStr = Field(description="Pro or Max API key, oxi_sk_live_...")
     oxinsider_api_base: str = "https://api.0xinsider.com"
 

@@ -38,7 +38,7 @@
 ## 0.4.0
 
 - Add `potd-trader kalshi` setup, market discovery, explicit contract review, dry-run, IOC buying,
-  watch, stop, ledger and read-only provider reconciliation commands. Default to isolated demo and
+  watch, stop, ledger and provider reconciliation commands, which change nothing on Kalshi. Default to isolated demo and
   stopped mode. Existing Polymarket commands keep their contracts.
 - Require reviewed source token/condition and destination ticker/outcome mappings. Pin both
   providers' rules, source kickoff and linked Kalshi contract PDF bytes; changed or uncertain
