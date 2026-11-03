@@ -20,7 +20,7 @@ transaction, live switch, or existing ledger was changed for verification.
   `SecureClient.create_market_order`, and `SecureClient.post_order`. The first secure method
   prepares/signs without posting; the second posts a supplied signed order. The combined
   helper's automatic allowance recovery is not used by the trader.
-- Read-only SDK witness at 2026-09-22T21:25Z: bounded public market page returned 100 markets,
+- SDK lookup witness at 2026-09-22T21:25Z: bounded public market page returned 100 markets,
   including 13 with a future sports kickoff. `PublicReads.market_for_token` returned an open,
   accepting binary market with a 0.01 tick and five-share minimum. Its SDK FAK estimate for
   5 pUSD was 0.52. Token:
